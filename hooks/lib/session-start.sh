@@ -7,6 +7,7 @@ set -uo pipefail
 df_active || exit 0
 profile="$(df_profile)"
 root="$(df_project_root)"
+fw_root="$(cd "$(dirname "$0")/../.." && pwd)"
 
 test_cmd="$(df_cfg test "$(df_detect_test)")"
 type_cmd="$(df_cfg typecheck "$(df_detect_typecheck)")"
@@ -38,17 +39,10 @@ banner="DEV-FRAMEWORK: ACTIVE (profile: ${profile}).
 
 ${posture}
 
-Work to the dev-framework discipline (see plugin rules): clear the quality bar, match
-existing codebase patterns (do not re-invent helpers or add a second way to do a thing),
-and ground every claim in tests you actually run.
-
-Default working loop:
-1. After planning a non-trivial change, get a design check (rubber-duck).
-2. Before adding any new helper / abstraction / dependency, check for prior art and
-   delegate a consistency check to the pattern-guardian agent.
-3. After a batch of edits, run the style-enforcer agent on the changed files.
-4. Before declaring done, run the test-grounder agent and a final pattern-guardian /
-   code-review pass. Resolve every blocking item.
+Work to the dev-framework discipline set out in the CONSTITUTION below: clear the
+quality bar, match existing codebase patterns (do not re-invent helpers or add a second
+way to do a thing), and ground every claim in tests you actually run. Use the
+pattern-guardian, style-enforcer, and test-grounder agents as your default working loop.
 
 This repo's verification tooling:
 - Tests: ${test_cmd:-<none detected — set \`test:\` in .dev-framework.yml or run \`df init\`>}
@@ -57,5 +51,25 @@ This repo's verification tooling:
 - Lint-on-edit: ${lint_note}
 ${style_line}"
 
-df_emit_context "$banner"
+# Append the constitution (rules/*.md) so the discipline is in-context for this session.
+# Plugins can't contribute always-on instructions, so we inject them here — which also
+# means they only load when the framework is active.
+constitution=""
+if [ -d "$fw_root/rules" ]; then
+  for rf in "$fw_root"/rules/*.md; do
+    [ -f "$rf" ] || continue
+    constitution="${constitution}
+
+$(cat "$rf")"
+  done
+fi
+
+if [ -n "$constitution" ]; then
+  df_emit_context "$banner
+
+============================ DEV-FRAMEWORK CONSTITUTION ============================
+$constitution"
+else
+  df_emit_context "$banner"
+fi
 exit 0

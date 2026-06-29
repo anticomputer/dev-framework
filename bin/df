@@ -122,6 +122,9 @@ case "${1:-}" in
   on)                shift; launch "standard" "$@" ;;
   init)              shift; cmd_init "$@" ;;
   status)            cmd_status ;;
+  version|--version|-v)
+                     v="$(python3 -c "import json;print(json.load(open('$FW/plugin.json'))['version'])" 2>/dev/null || echo '?')"
+                     echo "dev-framework $v" ;;
   help|-h|--help)    sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
   *)                 launch "" "$@" ;;   # treat unknown leading arg as copilot args
 esac

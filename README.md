@@ -12,7 +12,11 @@ so installing it never changes ordinary `copilot` behavior.
 ## Quick start
 
 ```bash
-./install.sh                       # register the plugin (dormant by default)
+# Install (any machine) — from GitHub via the official plugin marketplace flow:
+copilot plugin marketplace add anticomputer/dev-framework
+copilot plugin install dev-framework@dev-framework
+#   …or, from a local clone:  ./install.sh
+
 export PATH="$PWD/bin:$PATH"       # put the `df` CLI on your PATH
 
 cd ~/my/project
@@ -20,6 +24,9 @@ df init                            # detect the stack, write a tailored .dev-fra
 df status                          # see the resolved profile and detected tooling
 df                                 # launch copilot with the framework active
 ```
+
+The plugin is **dormant by default** — installing it never changes ordinary `copilot`
+behavior until a session opts in.
 
 ## Intensity profiles — the main dial
 
@@ -55,7 +62,7 @@ Four Copilot CLI extension primitives, verified against the CLI itself:
 
 | Layer | Primitive | Role |
 |-------|-----------|------|
-| **Constitution** | `rules/` (always-on) | Quality bar, match-existing-patterns, testing discipline, delegation loop. `00-activation` self-gates on the profile. |
+| **Constitution** | `rules/*.md` injected at `sessionStart` | Quality bar, match-existing-patterns, testing discipline, delegation loop. Injected into context only when the framework is active (plugins can't contribute always-on instructions, so the `sessionStart` hook delivers them — which keeps them dormant otherwise). |
 | **Specialists** | `agents/` | `pattern-guardian` (anti-drift), `style-enforcer`, `test-grounder` — investigation-only reviewers the agent delegates to. |
 | **Continuous engine** | `hooks/` | `sessionStart` injects a profile banner + this repo's tooling; `preToolUse` guards protected paths; `postToolUse` formats + lints each edited file and feeds violations back; `agentStop` is the completion gate. |
 | **Workflows** | `skills/` | `peer-review`, `ground-in-tests`, `match-patterns` — codified, invokable procedures. |
@@ -96,24 +103,39 @@ build output by default (deny in standard/strict, warn in advisory). Override wi
 ## Layout
 
 ```
-plugin.json                     # manifest (rules/agents/skills/hooks)
-.github/plugin/marketplace.json # publishable/installable marketplace entry
-rules/                          # always-on constitution (00-activation gates the rest)
+plugin.json                     # manifest (agents/skills/hooks)
+.github/plugin/marketplace.json # marketplace entry (so it installs by name)
+rules/                          # constitution source, injected at sessionStart when active
 agents/                         # pattern-guardian, style-enforcer, test-grounder
 hooks/hooks.json + hooks/lib/   # sessionStart, preToolUse, postToolUse, agentStop + lib
 skills/                         # peer-review, ground-in-tests, match-patterns
 .dev-framework.example.yml      # per-project config template
 bin/df                          # the df CLI / launcher
-install.sh / uninstall.sh       # register / unregister the plugin
+install.sh / uninstall.sh       # convenience wrappers around `copilot plugin`
 ```
 
-## Install / uninstall details
+## Install / manage / uninstall
 
-`./install.sh` points the plugin's `cache_path` at this directory (no copy/symlink), adds
-a registry entry to `~/.copilot/config.json`, and enables it in `settings.json`. It writes
-timestamped `.bak` backups, is idempotent, and preserves existing plugins/comments. Run it
-while **no** `copilot` session is active (the CLI rewrites `config.json` on exit).
-`./uninstall.sh` removes only the dev-framework entries.
+Installation uses the **official Copilot CLI plugin commands** — no manual config editing.
 
-Inside Copilot, run `/env` to confirm the framework's rules, agents, skills, and hooks are
-loaded.
+```bash
+# From GitHub (any machine):
+copilot plugin marketplace add anticomputer/dev-framework
+copilot plugin install dev-framework@dev-framework
+
+# From a local clone (registers this dir as a marketplace, then installs):
+./install.sh
+
+# Manage:
+copilot plugin list
+copilot plugin update dev-framework      # after new changes are pushed
+copilot plugin uninstall dev-framework   # (or ./uninstall.sh)
+```
+
+Plugins are cached on install, so after pushing changes run `copilot plugin update
+dev-framework` (or re-install) to pick them up. Inside Copilot, `/plugin list`, `/agent`,
+and `/skills list` confirm the framework loaded.
+
+> Note: direct `owner/repo`, URL, and local-path installs are being deprecated in favor of
+> the `plugin@marketplace` flow above — which is why both install paths register a
+> marketplace first.

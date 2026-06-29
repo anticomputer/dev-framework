@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least-privilege: this workflow only reads code and runs checks.
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to a commit SHA for supply-chain safety (actions/checkout v4.3.1)
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Shell syntax (bash -n)
+        run: |
+          for f in bin/df install.sh uninstall.sh hooks/lib/*.sh tests/run.sh; do
+            echo "bash -n $f"; bash -n "$f"
+          done
+
+      - name: ShellCheck (errors only)
+        run: |
+          shellcheck --severity=error --exclude=SC1090,SC1091 \
+            bin/df install.sh uninstall.sh hooks/lib/*.sh tests/run.sh
+
+      - name: Validate JSON
+        run: |
+          for f in plugin.json .github/plugin/marketplace.json hooks/hooks.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1])); print('ok', sys.argv[1])" "$f"
+          done
+
+      - name: Validate manifests
+        run: python3 .github/scripts/validate-manifests.py
+
+      - name: Run test suite
+        run: bash tests/run.sh

@@ -13,14 +13,6 @@
       "description": "Always-on quality bar + continuous style enforcement, anti-drift peer review, and test-grounded completion gates. Opt-in per session via DEV_FRAMEWORK=1 or a .dev-framework.yml in the repo.",
       "version": "0.1.0",
       "source": ".",
-      "rules": "rules",
-      "agents": "agents",
-      "skills": [
-        "skills/peer-review",
-        "skills/ground-in-tests",
-        "skills/match-patterns"
-      ],
-      "hooks": "hooks/hooks.json",
       "keywords": ["quality", "style", "review", "testing", "agentic"],
       "license": "MIT"
     }
