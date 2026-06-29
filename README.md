@@ -1,13 +1,26 @@
 # dev-framework
 
-An opt-in **agentic software-engineering discipline** for the GitHub Copilot CLI. Point a
-Copilot session at it and the framework continuously holds the agent to a quality bar:
-close style-guide adherence, peer review that prevents code fragmentation and drift,
-reuse of existing patterns over re-invention, and completion that is **gated on tests the
-agent actually runs** — so it stays grounded in reality, not plausible-sounding claims.
+**Make Copilot CLI prove its work instead of trusting it.** AI coding agents are fast but
+undisciplined: they drift from your conventions, reinvent helpers that already exist, skip
+tests, and declare "done" on code they never ran. dev-framework is a Copilot CLI plugin
+that puts an automatic quality gate around every session — so the agent formats, lints,
+matches your existing patterns, gets peer-reviewed, and **cannot finish until your tests
+actually pass**.
 
-It's a single self-contained Copilot CLI **plugin**, **dormant** until a session opts in,
-so installing it never changes ordinary `copilot` behavior.
+> Use it when you want to hand a Copilot session a real task and trust the output enough to
+> stop babysitting it — on your project, in your style, grounded in your test suite.
+
+**Typical uses**
+- Let an agent implement a feature or fix a bug in a large codebase without it drifting or
+  re-inventing utilities — and without you re-reviewing slop.
+- Enforce one team-wide quality bar across every contributor's Copilot sessions by
+  committing a single `.dev-framework.yml`.
+- Run long or autonomous sessions safely: a failing test suite blocks completion, and
+  protected files (lockfiles, `.env`, generated code) can't be edited.
+
+It's a single self-contained plugin, **dormant until a session opts in**, so installing it
+never changes ordinary `copilot` behavior. Dial the intensity from *advisory* (just coach
+me) to *strict* (hard gate) per session or per repo.
 
 ## Quick start
 
