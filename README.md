@@ -71,6 +71,44 @@ that session. `df off` runs a fully dormant session.
 
 ## How it works
 
+The framework hooks into the Copilot session lifecycle. When a session opts in, it injects
+your discipline up front, checks every edit as it happens, and gates completion on real
+tests:
+
+```mermaid
+flowchart TD
+    A([copilot session starts]) --> B{Active?<br/>DEV_FRAMEWORK set<br/>or .dev-framework.yml present}
+    B -- no --> Z([Ordinary copilot —<br/>framework dormant])
+    B -- yes --> C[sessionStart hook:<br/>inject constitution + profile<br/>+ detected repo tooling]
+    C --> D[Agent works on your task]
+
+    D -->|edits a file| F[preToolUse hook:<br/>protected-path guardrail]
+    F -->|lockfile / .env / generated| X[Deny or warn]
+    X --> D
+    F -->|allowed| G[edit applied]
+    G --> H[postToolUse hook:<br/>format + lint the file,<br/>feed violations back]
+    H --> D
+
+    D -.delegates.-> R[Specialist agents:<br/>pattern-guardian · style-enforcer · test-grounder]
+    R -.findings.-> D
+
+    D -->|tries to finish| J{agentStop hook:<br/>completion gate<br/>type-check + tests<br/>+ strict lint}
+    J -->|red| K[BLOCK + feedback:<br/>fix the cause, keep working]
+    K --> D
+    J -->|green| L([Done ✓ — verified])
+
+    classDef gate fill:#fde2e2,stroke:#c0392b,color:#000;
+    classDef pass fill:#e2f7e2,stroke:#27ae60,color:#000;
+    class F,J,X,K gate;
+    class L,Z pass;
+```
+
+Intensity profile changes how hard the gates push: **advisory** never blocks (everything
+is feedback), **standard** blocks on failing type-check/tests and denies protected edits,
+**strict** also blocks on lint of changed files.
+
+### The primitives
+
 Four Copilot CLI extension primitives, verified against the CLI itself:
 
 | Layer | Primitive | Role |
