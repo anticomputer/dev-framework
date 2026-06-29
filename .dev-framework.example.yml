@@ -7,6 +7,8 @@
 # Parsed as simple flat `key: value` lines (not full YAML). Quote values if needed.
 # Per-session override of `profile` (and activation) is also possible via the
 # DEV_FRAMEWORK env var, e.g. `DEV_FRAMEWORK=strict copilot`, or the `df` wrapper.
+#
+# Full reference (grammar, every key, defaults, examples): see CONFIGURATION.md
 
 # --- Intensity profile -----------------------------------------------------
 # off      : dormant (no rules applied, no hooks fire)

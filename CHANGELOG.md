@@ -7,6 +7,8 @@ All notable changes to dev-framework are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`CONFIGURATION.md`** — full `.dev-framework.yml` reference: grammar, every key with
+  type/default, substitution tokens, glob syntax, and worked examples.
 - **Broad language support** for auto-detection: tests (RSpec/Rake, Gradle/Maven,
   `dotnet test`, `mix test`, PHPUnit, sbt, `swift test`, dart/flutter, deno, make/just),
   type-check (mypy, pyright, flow), format and lint across ~20 ecosystems — each gated on

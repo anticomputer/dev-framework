@@ -135,14 +135,16 @@ not to get in the way:
 
 ## Configure per project
 
-`df init` writes `.dev-framework.yml`; `.dev-framework.example.yml` documents every key.
-All keys are optional — blank values are auto-detected. **Commit `.dev-framework.yml`** to
-give a whole team identical enforcement.
+`df init` writes `.dev-framework.yml`; **[`CONFIGURATION.md`](CONFIGURATION.md) is the full
+reference** — the grammar, every key with its type/default, substitution tokens, glob
+syntax, and worked examples. `.dev-framework.example.yml` is an annotated template. All keys
+are optional — blank values are auto-detected. **Commit `.dev-framework.yml`** to give a
+whole team identical enforcement.
 
-Key options: `profile`, `test`/`typecheck`/`format`/`lint` (+ per-language `format.<ext>` /
-`lint.<ext>`), `precommit`, `format_on_edit`/`lint_on_edit`, the `gate_*` set,
-`protect`/`protect_mode`/`protect_off`, `exclude` (globs to skip for format/lint), and
-`style_guide`.
+Key options at a glance: `profile`, `test`/`typecheck`/`format`/`lint` (+ per-language
+`format.<ext>` / `lint.<ext>`), `precommit`, `format_on_edit`/`lint_on_edit`, the `gate_*`
+set, `protect`/`protect_mode`/`protect_off`, `exclude`, and `style_guide`. See
+[CONFIGURATION.md](CONFIGURATION.md) for details.
 
 ## Language support
 
@@ -185,6 +187,7 @@ skills/                         # peer-review, ground-in-tests, match-patterns
 .dev-framework.example.yml      # per-project config template
 bin/df                          # the df CLI / launcher
 install.sh / uninstall.sh       # convenience wrappers around `copilot plugin`
+CONFIGURATION.md                # full .dev-framework.yml reference
 ```
 
 ## Install / manage / uninstall
