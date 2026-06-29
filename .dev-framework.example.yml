@@ -19,10 +19,25 @@ profile: standard
 
 # --- Commands (blank = auto-detect) ----------------------------------------
 # {file}  -> the edited file (format/lint);  {files} -> changed files (test_changed)
-test:                          # e.g. npm test | pytest -q | go test ./...
-typecheck:                     # e.g. tsc --noEmit | mypy .
-format:                        # e.g. prettier --write {file}   (blank = auto per file)
-lint:                          # e.g. eslint {file}             (blank = auto per file)
+# Auto-detection covers many ecosystems (JS/TS, Python, Go, Rust, Ruby, Java/Kotlin,
+# PHP, C#, Swift, C/C++, Elixir, Scala, Dart, shell, Terraform, Lua, Nix, ...) and only
+# runs tools that are installed. It also prefers your project's own task runners
+# (Makefile/justfile/npm scripts) and pre-commit when present.
+test:                          # e.g. npm test | pytest -q | go test ./... | cargo test
+typecheck:                     # e.g. tsc --noEmit | mypy . | pyright
+format:                        # global formatter; {file} substituted (blank = auto per file)
+lint:                          # global linter; {file} substituted (blank = auto per file)
+
+# Per-language overrides (win over the generic format/lint above and over auto-detect).
+# Use the file extension as the suffix. Examples:
+# format.py: ruff format {file}
+# lint.py:   ruff check {file}
+# format.go: gofumpt -w {file}
+# lint.rb:   rubocop {file}
+
+# pre-commit: if a .pre-commit-config.yaml exists and pre-commit is installed, it is used
+# for per-file format+lint automatically. Set to off to ignore it.
+precommit: auto                # auto | off
 
 # --- Live (per-edit) enforcement -------------------------------------------
 format_on_edit: true           # auto-format each file the agent writes

@@ -85,14 +85,36 @@ not to get in the way:
 ## Configure per project
 
 `df init` writes `.dev-framework.yml`; `.dev-framework.example.yml` documents every key.
-All keys are optional — blank values are auto-detected (npm/pnpm/yarn, pytest, `go test`,
-`cargo test`, `make test`; prettier/eslint, ruff/black/flake8, gofmt, rustfmt, tsc), and
-only tools that are actually installed are run. **Commit `.dev-framework.yml`** to give a
-whole team identical enforcement.
+All keys are optional — blank values are auto-detected. **Commit `.dev-framework.yml`** to
+give a whole team identical enforcement.
 
-Key options: `profile`, `test`/`typecheck`/`format`/`lint`, `format_on_edit`/`lint_on_edit`,
-the `gate_*` set, `protect`/`protect_mode`/`protect_off`, `exclude` (globs to skip for
-format/lint), and `style_guide`.
+Key options: `profile`, `test`/`typecheck`/`format`/`lint` (+ per-language `format.<ext>` /
+`lint.<ext>`), `precommit`, `format_on_edit`/`lint_on_edit`, the `gate_*` set,
+`protect`/`protect_mode`/`protect_off`, `exclude` (globs to skip for format/lint), and
+`style_guide`.
+
+## Language support
+
+The framework is language-agnostic. For each edited file it picks the right formatter and
+linter by extension, and it discovers repo-level test/type-check commands — running **only
+tools that are actually installed**. Detection order, highest priority first:
+
+1. **Explicit config** — `test`/`typecheck`, the global `format`/`lint`, or per-language
+   `format.<ext>` / `lint.<ext>` overrides.
+2. **Your project's task runners** — `make` / `just` targets and npm scripts (`test`,
+   `typecheck`), and **pre-commit** (`.pre-commit-config.yaml`) for per-file format+lint.
+3. **Built-in detection** by ecosystem / extension:
+   - **Tests:** npm/pnpm/yarn, pytest, `go test`, `cargo test`, RSpec/Rake, Gradle/Maven,
+     `dotnet test`, `mix test`, PHPUnit, sbt, `swift test`, dart/flutter, deno, make/just.
+   - **Type-check:** `tsc`, mypy, pyright, flow.
+   - **Format:** prettier (JS/TS/JSON/CSS/HTML/MD/YAML/…), ruff/black, gofmt/gofumpt,
+     rustfmt, rubocop, google-java-format, ktlint, php-cs-fixer, csharpier, swiftformat,
+     clang-format, shfmt, stylua, scalafmt, dart, terraform, taplo, `mix format`, zig.
+   - **Lint:** eslint, ruff/flake8, rubocop, phpcs, shellcheck, luacheck, ktlint, tflint,
+     stylelint, yamllint, hadolint.
+
+Run **`df status`** in any repo to see exactly which commands resolve for the file types
+present there. Anything missing or wrong? Pin it with `test:`, `format.<ext>:`, etc.
 
 ## Protected paths
 

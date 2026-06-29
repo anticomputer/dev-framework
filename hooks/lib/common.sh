@@ -176,60 +176,156 @@ df_pkg_manager() {
 }
 
 # ---- auto-detection -------------------------------------------------------
-df_detect_test() {
+# Prefer the project's own declared tasks (make / just / npm) and pre-commit over guesses.
+
+df_have_make_target() {
   local root; root="$(df_project_root)"
-  if [ -f "$root/package.json" ] && command -v python3 >/dev/null 2>&1; then
-    local has_test pm
-    has_test="$(python3 - "$root/package.json" <<'PY'
+  [ -f "$root/Makefile" ] && command -v make >/dev/null 2>&1 && grep -qE "^$1:" "$root/Makefile" 2>/dev/null
+}
+df_have_just_recipe() {
+  local root; root="$(df_project_root)"
+  { [ -f "$root/justfile" ] || [ -f "$root/Justfile" ] || [ -f "$root/.justfile" ]; } \
+    && command -v just >/dev/null 2>&1 \
+    && just --summary 2>/dev/null | tr ' ' '\n' | grep -qx "$1"
+}
+df_npm_script() {  # 0 if package.json has a usable script NAME
+  local root; root="$(df_project_root)"
+  [ -f "$root/package.json" ] && command -v python3 >/dev/null 2>&1 || return 1
+  python3 - "$root/package.json" "$1" <<'PY' 2>/dev/null
 import json,sys
 try:
-    d=json.load(open(sys.argv[1])); s=(d.get('scripts') or {}).get('test','')
-    print('yes' if s and 'no test specified' not in s else 'no')
+    d=json.load(open(sys.argv[1])); s=(d.get('scripts') or {}).get(sys.argv[2],'')
+    sys.exit(0 if s and 'no test specified' not in s else 1)
 except Exception:
-    print('no')
+    sys.exit(1)
 PY
-)"
-    if [ "$has_test" = "yes" ]; then pm="$(df_pkg_manager)"; [ -n "$pm" ] && { printf '%s test' "$pm"; return; }; fi
+}
+
+# pre-commit: the most language-agnostic per-file check. Active when a config exists, the
+# tool is installed, and `precommit` isn't off. When active it handles BOTH format & lint.
+df_precommit_active() {
+  local root; root="$(df_project_root)"
+  { [ -f "$root/.pre-commit-config.yaml" ] || [ -f "$root/.pre-commit-config.yml" ]; } || return 1
+  [ -n "$(df_bin pre-commit)" ] || return 1
+  case "$(printf '%s' "$(df_cfg precommit auto)" | tr '[:upper:]' '[:lower:]')" in
+    off|false|no|0) return 1 ;;
+  esac
+  return 0
+}
+df_precommit_cmd() { printf '%s run --files' "$(df_bin pre-commit)"; }
+
+df_detect_test() {
+  local root pm; root="$(df_project_root)"
+  df_have_make_target test && { printf 'make test'; return; }
+  df_have_just_recipe test && { printf 'just test'; return; }
+  if df_npm_script test; then pm="$(df_pkg_manager)"; [ -n "$pm" ] && { printf '%s test' "$pm"; return; }; fi
+  if { [ -f "$root/pyproject.toml" ] || [ -f "$root/pytest.ini" ] || [ -f "$root/tox.ini" ] || [ -f "$root/setup.cfg" ] || [ -d "$root/tests" ]; } && command -v pytest >/dev/null 2>&1; then
+    printf 'pytest -q'; return; fi
+  [ -f "$root/go.mod" ] && command -v go >/dev/null 2>&1 && { printf 'go test ./...'; return; }
+  [ -f "$root/Cargo.toml" ] && command -v cargo >/dev/null 2>&1 && { printf 'cargo test'; return; }
+  if [ -f "$root/Gemfile" ] && command -v bundle >/dev/null 2>&1; then
+    [ -d "$root/spec" ] && { printf 'bundle exec rspec'; return; }
+    [ -f "$root/Rakefile" ] && { printf 'bundle exec rake test'; return; }
   fi
-  if { [ -f "$root/pyproject.toml" ] || [ -f "$root/pytest.ini" ] || [ -f "$root/setup.cfg" ] || [ -d "$root/tests" ]; } && command -v pytest >/dev/null 2>&1; then
-    printf 'pytest -q'; return
+  if [ -x "$root/gradlew" ]; then printf './gradlew test'; return; fi
+  { [ -f "$root/build.gradle" ] || [ -f "$root/build.gradle.kts" ]; } && command -v gradle >/dev/null 2>&1 && { printf 'gradle test'; return; }
+  [ -f "$root/pom.xml" ] && command -v mvn >/dev/null 2>&1 && { printf 'mvn -q test'; return; }
+  if command -v dotnet >/dev/null 2>&1 && ls "$root"/*.sln "$root"/*.csproj >/dev/null 2>&1; then printf 'dotnet test'; return; fi
+  [ -f "$root/mix.exs" ] && command -v mix >/dev/null 2>&1 && { printf 'mix test'; return; }
+  if [ -f "$root/composer.json" ]; then
+    [ -x "$root/vendor/bin/phpunit" ] && { printf 'vendor/bin/phpunit'; return; }
+    command -v phpunit >/dev/null 2>&1 && { printf 'phpunit'; return; }
   fi
-  if [ -f "$root/go.mod" ] && command -v go >/dev/null 2>&1; then printf 'go test ./...'; return; fi
-  if [ -f "$root/Cargo.toml" ] && command -v cargo >/dev/null 2>&1; then printf 'cargo test'; return; fi
-  if [ -f "$root/Makefile" ] && grep -qE '^test:' "$root/Makefile" 2>/dev/null && command -v make >/dev/null 2>&1; then
-    printf 'make test'; return
+  [ -f "$root/build.sbt" ] && command -v sbt >/dev/null 2>&1 && { printf 'sbt test'; return; }
+  [ -f "$root/Package.swift" ] && command -v swift >/dev/null 2>&1 && { printf 'swift test'; return; }
+  if [ -f "$root/pubspec.yaml" ]; then
+    grep -q 'flutter' "$root/pubspec.yaml" 2>/dev/null && command -v flutter >/dev/null 2>&1 && { printf 'flutter test'; return; }
+    command -v dart >/dev/null 2>&1 && { printf 'dart test'; return; }
   fi
+  { [ -f "$root/deno.json" ] || [ -f "$root/deno.jsonc" ]; } && command -v deno >/dev/null 2>&1 && { printf 'deno test'; return; }
 }
 
 df_detect_typecheck() {
-  local root tsc; root="$(df_project_root)"
-  if [ -f "$root/tsconfig.json" ]; then
-    tsc="$(df_bin tsc)"; [ -n "$tsc" ] && { printf '%s --noEmit' "$tsc"; return; }
-  fi
+  local root tsc fl; root="$(df_project_root)"
+  df_have_make_target typecheck && { printf 'make typecheck'; return; }
+  if [ -f "$root/tsconfig.json" ]; then tsc="$(df_bin tsc)"; [ -n "$tsc" ] && { printf '%s --noEmit' "$tsc"; return; }; fi
+  if command -v mypy >/dev/null 2>&1 && grep -rqsE 'tool\.mypy|^\[mypy\]' "$root/pyproject.toml" "$root/setup.cfg" "$root/mypy.ini" 2>/dev/null; then
+    printf 'mypy .'; return; fi
+  [ -f "$root/pyrightconfig.json" ] && command -v pyright >/dev/null 2>&1 && { printf 'pyright'; return; }
+  if [ -f "$root/.flowconfig" ]; then fl="$(df_bin flow)"; [ -n "$fl" ] && { printf '%s check' "$fl"; return; }; fi
 }
 
+# df_detect_format FILE -> in-place formatter command for the file's type (if installed).
 df_detect_format() {
-  local f="$1" ext bin; ext="${f##*.}"
+  local f="$1" ext bin; ext="$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
+  df_precommit_active && return 0          # pre-commit (run as lint) handles formatting
   case "$ext" in
-    js|jsx|ts|tsx|mjs|cjs|json|css|scss|less|md|mdx|yaml|yml|html|vue)
+    js|jsx|ts|tsx|mjs|cjs|vue|svelte|json|jsonc|json5|css|scss|less|html|htm|md|mdx|yaml|yml|graphql|gql)
       bin="$(df_bin prettier)"; [ -n "$bin" ] && printf '%s --write' "$bin" ;;
-    py)
-      bin="$(df_bin ruff)"; if [ -n "$bin" ]; then printf '%s format' "$bin";
-      else bin="$(df_bin black)"; [ -n "$bin" ] && printf '%s' "$bin"; fi ;;
-    go)  bin="$(df_bin gofmt)";   [ -n "$bin" ] && printf '%s -w' "$bin" ;;
-    rs)  bin="$(df_bin rustfmt)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    py)   bin="$(df_bin ruff)"; if [ -n "$bin" ]; then printf '%s format' "$bin"; else bin="$(df_bin black)"; [ -n "$bin" ] && printf '%s' "$bin"; fi ;;
+    go)   bin="$(df_bin gofumpt)"; [ -n "$bin" ] || bin="$(df_bin gofmt)"; [ -n "$bin" ] && printf '%s -w' "$bin" ;;
+    rs)   bin="$(df_bin rustfmt)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    rb)   bin="$(df_bin rubocop)"; [ -n "$bin" ] && printf '%s -A -f quiet' "$bin" ;;
+    java) bin="$(df_bin google-java-format)"; [ -n "$bin" ] && printf '%s -i' "$bin" ;;
+    kt|kts) bin="$(df_bin ktlint)"; [ -n "$bin" ] && printf '%s -F' "$bin" ;;
+    php)  bin="$(df_bin php-cs-fixer)"; if [ -n "$bin" ]; then printf '%s fix' "$bin"; else bin="$(df_bin phpcbf)"; [ -n "$bin" ] && printf '%s' "$bin"; fi ;;
+    cs)   bin="$(df_bin csharpier)"; [ -n "$bin" ] && printf '%s format' "$bin" ;;
+    swift) bin="$(df_bin swiftformat)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    c|h|cc|cpp|cxx|hpp|hh|hxx|m|mm) bin="$(df_bin clang-format)"; [ -n "$bin" ] && printf '%s -i' "$bin" ;;
+    sh|bash) bin="$(df_bin shfmt)"; [ -n "$bin" ] && printf '%s -w' "$bin" ;;
+    lua)  bin="$(df_bin stylua)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    scala|sc) bin="$(df_bin scalafmt)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    dart) bin="$(df_bin dart)"; [ -n "$bin" ] && printf '%s format' "$bin" ;;
+    tf|tfvars|hcl) bin="$(df_bin terraform)"; [ -n "$bin" ] && printf '%s fmt' "$bin" ;;
+    nix)  bin="$(df_bin alejandra)"; [ -n "$bin" ] || bin="$(df_bin nixpkgs-fmt)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    toml) bin="$(df_bin taplo)"; [ -n "$bin" ] && printf '%s fmt' "$bin" ;;
+    ex|exs) command -v mix >/dev/null 2>&1 && printf 'mix format' ;;
+    zig)  bin="$(df_bin zig)"; [ -n "$bin" ] && printf '%s fmt' "$bin" ;;
   esac
 }
 
+# df_detect_lint FILE -> linter command for the file's type (if installed).
 df_detect_lint() {
-  local f="$1" ext bin; ext="${f##*.}"
+  local f="$1" ext bin; ext="$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
+  df_precommit_active && { df_precommit_cmd; return 0; }   # pre-commit covers lint (+format)
   case "$ext" in
-    js|jsx|ts|tsx|mjs|cjs)
-      bin="$(df_bin eslint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
-    py)
-      bin="$(df_bin ruff)"; if [ -n "$bin" ]; then printf '%s check' "$bin";
-      else bin="$(df_bin flake8)"; [ -n "$bin" ] && printf '%s' "$bin"; fi ;;
+    js|jsx|ts|tsx|mjs|cjs) bin="$(df_bin eslint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    py)   bin="$(df_bin ruff)"; if [ -n "$bin" ]; then printf '%s check' "$bin"; else bin="$(df_bin flake8)"; [ -n "$bin" ] && printf '%s' "$bin"; fi ;;
+    rb)   bin="$(df_bin rubocop)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    php)  bin="$(df_bin phpcs)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    sh|bash) bin="$(df_bin shellcheck)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    lua)  bin="$(df_bin luacheck)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    kt|kts) bin="$(df_bin ktlint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    tf|tfvars) bin="$(df_bin tflint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    css|scss) bin="$(df_bin stylelint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    yaml|yml) bin="$(df_bin yamllint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
+    dockerfile) bin="$(df_bin hadolint)"; [ -n "$bin" ] && printf '%s' "$bin" ;;
   esac
+}
+
+# df_lang_cmd KIND FILE  -> config override (KIND.ext, then KIND), else auto-detection.
+# KIND is `format` or `lint`. Lets a project pin per-language commands, e.g. `lint.py:`.
+df_lang_cmd() {
+  local kind="$1" file="$2" ext v
+  ext="$(printf '%s' "${file##*.}" | tr '[:upper:]' '[:lower:]')"
+  v="$(df_cfg "$kind.$ext" "$(df_cfg "$kind" '')")"
+  if [ -n "$v" ]; then printf '%s' "$v"; return; fi
+  case "$kind" in
+    format) df_detect_format "$file" ;;
+    lint)   df_detect_lint "$file" ;;
+  esac
+}
+
+# df_exts_present -> distinct file extensions in the repo (most common first). Includes
+# untracked-but-not-ignored files; falls back to find outside a git repo.
+df_exts_present() {
+  local root; root="$(df_project_root)"
+  if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    { git -C "$root" ls-files; git -C "$root" ls-files --others --exclude-standard; } 2>/dev/null
+  else
+    find "$root" -type f -not -path '*/.git/*' 2>/dev/null
+  fi | grep -oE '\.[A-Za-z0-9]+$' | tr '[:upper:]' '[:lower:]' \
+     | sort | uniq -c | sort -rn | awk '{print substr($2,2)}' | head -40
 }
 
 # ---- command assembly -----------------------------------------------------

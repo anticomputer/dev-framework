@@ -120,6 +120,39 @@ echo "# sessionStart injects banner + constitution"
   assert_empty "dormant session injects nothing" "$out"
 )
 
+echo "# language configuration"
+(
+  PROJ="$(newproj)"; export COPILOT_PROJECT_DIR="$PROJ"; cd "$PROJ"; . "$COMMON"; export DEV_FRAMEWORK=standard
+  # per-language override wins over generic + auto-detect
+  printf 'format: GENERIC {file}\nformat.py: PYFMT {file}\nlint.go: GOLINT {file}\n' > "$PROJ/.dev-framework.yml"
+  assert_eq "format.py override"   "PYFMT {file}"   "$(df_lang_cmd format x.py)"
+  assert_eq "generic format for js" "GENERIC {file}" "$(df_lang_cmd format x.js)"
+  assert_eq "lint.go override"     "GOLINT {file}"  "$(df_lang_cmd lint x.go)"
+  # df_exts_present
+  cd "$PROJ"; git init -q >/dev/null 2>&1; touch a.py b.js c.py; git add -A >/dev/null 2>&1
+  exts="$(df_exts_present | tr '\n' ' ')"
+  assert_contains "exts include py" "py" "$exts"
+  assert_contains "exts include js" "js" "$exts"
+  # task-runner preference: Makefile test target
+  printf 'profile: standard\n' > "$PROJ/.dev-framework.yml"
+  printf 'test:\n\t@echo hi\n' > "$PROJ/Makefile"
+  if command -v make >/dev/null 2>&1; then assert_eq "prefers make test" "make test" "$(df_detect_test)"; else ok "make not installed (skip)"; fi
+)
+
+echo "# pre-commit integration"
+(
+  PROJ="$(newproj)"; export COPILOT_PROJECT_DIR="$PROJ"; cd "$PROJ"; . "$COMMON"; export DEV_FRAMEWORK=standard
+  bindir="$(mktemp -d)"; printf '#!/bin/sh\nexit 0\n' > "$bindir/pre-commit"; chmod +x "$bindir/pre-commit"
+  export PATH="$bindir:$PATH"
+  printf 'repos: []\n' > "$PROJ/.pre-commit-config.yaml"
+  printf 'profile: standard\n' > "$PROJ/.dev-framework.yml"
+  df_precommit_active && ok "pre-commit active when present" || bad "pre-commit active when present"
+  assert_contains "lint uses pre-commit" "run --files" "$(df_lang_cmd lint x.py)"
+  assert_empty "format deferred to pre-commit" "$(df_lang_cmd format x.py)"
+  printf 'profile: standard\nprecommit: off\n' > "$PROJ/.dev-framework.yml"
+  df_precommit_active && bad "precommit off disables" || ok "precommit off disables"
+)
+
 echo "# df CLI: init + status"
 (
   PROJ="$(newproj)"; cd "$PROJ"; git init -q

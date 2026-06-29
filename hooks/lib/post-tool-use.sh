@@ -30,8 +30,7 @@ fi
 feedback=""
 
 if df_truthy "$(df_opt format_on_edit)"; then
-  fmt_cmd="$(df_cfg format '')"
-  [ -n "$fmt_cmd" ] || fmt_cmd="$(df_detect_format "$file")"
+  fmt_cmd="$(df_lang_cmd format "$file")"
   if [ -n "$fmt_cmd" ]; then
     full="$(df_apply_file "$fmt_cmd" "$file")"
     fmt_out="$( ( cd "$(df_project_root)" && eval "$full" ) 2>&1 )"; fmt_rc=$?
@@ -43,8 +42,7 @@ $(printf '%s' "$fmt_out" | head -c 1500)
 fi
 
 if df_truthy "$(df_opt lint_on_edit)"; then
-  lint_cmd="$(df_cfg lint '')"
-  [ -n "$lint_cmd" ] || lint_cmd="$(df_detect_lint "$file")"
+  lint_cmd="$(df_lang_cmd lint "$file")"
   if [ -n "$lint_cmd" ]; then
     full="$(df_apply_file "$lint_cmd" "$file")"
     lint_out="$( ( cd "$(df_project_root)" && eval "$full" ) 2>&1 )"; lint_rc=$?

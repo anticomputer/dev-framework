@@ -57,7 +57,7 @@ if df_truthy "$(df_opt gate_lint_changed)"; then
   while IFS= read -r cf; do
     [ -n "$cf" ] || continue
     [ -f "$root/$cf" ] || continue
-    lc="$(df_cfg lint '')"; [ -n "$lc" ] || lc="$(df_detect_lint "$cf")"
+    lc="$(df_lang_cmd lint "$cf")"
     [ -n "$lc" ] || continue
     failures="${failures}$(run_cmd "Lint $cf" "$(df_apply_file "$lc" "$root/$cf")")"
   done <<EOF

@@ -4,6 +4,20 @@ All notable changes to dev-framework are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Broad language support** for auto-detection: tests (RSpec/Rake, Gradle/Maven,
+  `dotnet test`, `mix test`, PHPUnit, sbt, `swift test`, dart/flutter, deno, make/just),
+  type-check (mypy, pyright, flow), format and lint across ~20 ecosystems — each gated on
+  the tool being installed.
+- **Project task-runner preference**: `make`/`just` targets, npm scripts, and **pre-commit**
+  (`.pre-commit-config.yaml`) are used when present.
+- **Per-language config overrides** via `format.<ext>` / `lint.<ext>` keys, plus a
+  `precommit: auto|off` toggle.
+- `df status` now shows the resolved formatter/linter for each file type in the repo;
+  `df init` reports detected file types.
+
 ## [0.1.0] - 2026-06-29
 
 Initial release.
