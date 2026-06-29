@@ -7,6 +7,9 @@ All notable changes to dev-framework are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`examples/todo-service/`** — a worked example with a `WALKTHROUGH.md` showing how a
+  project defines its conventions (`.dev-framework.yml` + `STYLE.md` + `AGENTS.md`) and how
+  the framework keeps an agent on the rails through a real change.
 - **`CONFIGURATION.md`** — full `.dev-framework.yml` reference: grammar, every key with
   type/default, substitution tokens, glob syntax, and worked examples.
 - **Broad language support** for auto-detection: tests (RSpec/Rake, Gradle/Maven,

@@ -1,0 +1,10 @@
+# dev-framework — defines this repo's profile, commands, and where the style guide lives.
+# With this file committed, every Copilot session in this repo runs on the rails below.
+
+profile: standard          # gate blocks completion on failing type-check/tests
+
+test: pytest -q
+format.py: ruff format {file}
+lint.py:   ruff check {file}
+
+style_guide: STYLE.md      # injected so the agent reads our conventions before writing

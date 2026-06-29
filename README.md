@@ -41,6 +41,14 @@ df                                 # launch copilot with the framework active
 The plugin is **dormant by default** — installing it never changes ordinary `copilot`
 behavior until a session opts in.
 
+## See it in action
+
+[**examples/todo-service**](examples/todo-service/WALKTHROUGH.md) is a complete worked
+example: it shows how a project defines its conventions (a `.dev-framework.yml`, a `STYLE.md`,
+and `AGENTS.md`), then walks through a real change where the framework keeps the agent on the
+rails — reusing existing patterns, fixing lint as it types, and **blocking a premature
+"done" on a failing test** until it's fixed. Start there if you want the 2-minute "why."
+
 ## Intensity profiles — the main dial
 
 One knob sets how hard the framework pushes. Set it per repo (`profile:` in
@@ -188,6 +196,7 @@ skills/                         # peer-review, ground-in-tests, match-patterns
 bin/df                          # the df CLI / launcher
 install.sh / uninstall.sh       # convenience wrappers around `copilot plugin`
 CONFIGURATION.md                # full .dev-framework.yml reference
+examples/todo-service/          # worked example + WALKTHROUGH.md
 ```
 
 ## Install / manage / uninstall
