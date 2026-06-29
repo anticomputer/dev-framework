@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Editor cruft
+*.swp
+*~
+
+# Backups written by install.sh / uninstall.sh (into COPILOT_HOME, but ignore here too)
+*.bak
+*.bak.*
+
+# Local per-repo activation file should NOT live in the framework repo itself
+.dev-framework.yml

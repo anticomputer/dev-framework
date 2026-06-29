@@ -1,0 +1,26 @@
+{
+  "name": "dev-framework",
+  "description": "Agentic software-engineering discipline for Copilot CLI: always-on quality bar, continuous style enforcement, anti-drift peer review, and test-grounded completion gates. Dormant until a session opts in (DEV_FRAMEWORK=1 or a .dev-framework.yml in the repo).",
+  "version": "0.1.0",
+  "author": {
+    "name": "anticomputer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "copilot-cli",
+    "code-review",
+    "style-guide",
+    "quality",
+    "testing",
+    "anti-drift",
+    "agentic"
+  ],
+  "rules": "rules",
+  "agents": "agents",
+  "skills": [
+    "skills/peer-review",
+    "skills/ground-in-tests",
+    "skills/match-patterns"
+  ],
+  "hooks": "hooks/hooks.json"
+}

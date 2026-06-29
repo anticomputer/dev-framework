@@ -1,0 +1,51 @@
+# .dev-framework.yml — per-project configuration for the dev-framework plugin.
+#
+# Copy this to a repository root as `.dev-framework.yml` (or run `df init`). Its presence
+# activates the framework for any Copilot session in that repo. Every key is OPTIONAL —
+# blank values are auto-detected. Commit it to share identical enforcement with your team.
+#
+# Parsed as simple flat `key: value` lines (not full YAML). Quote values if needed.
+# Per-session override of `profile` (and activation) is also possible via the
+# DEV_FRAMEWORK env var, e.g. `DEV_FRAMEWORK=strict copilot`, or the `df` wrapper.
+
+# --- Intensity profile -----------------------------------------------------
+# off      : dormant (no rules applied, no hooks fire)
+# advisory : formatting/lint/review feedback inline, but NOTHING blocks; protected-path
+#            edits are only warned about
+# standard : + completion gate runs type-check & tests and BLOCKS finishing while red;
+#            protected-path edits are denied
+# strict   : + lint of changed files must also pass at the gate
+profile: standard
+
+# --- Commands (blank = auto-detect) ----------------------------------------
+# {file}  -> the edited file (format/lint);  {files} -> changed files (test_changed)
+test:                          # e.g. npm test | pytest -q | go test ./...
+typecheck:                     # e.g. tsc --noEmit | mypy .
+format:                        # e.g. prettier --write {file}   (blank = auto per file)
+lint:                          # e.g. eslint {file}             (blank = auto per file)
+
+# --- Live (per-edit) enforcement -------------------------------------------
+format_on_edit: true           # auto-format each file the agent writes
+lint_on_edit: true             # lint each edited file and feed violations back
+
+# --- Completion gate (agentStop) -------------------------------------------
+gate_run_typecheck: true
+gate_run_tests: true
+gate_skip_unchanged: true      # don't run the gate if no files changed this session
+gate_scope: all                # all | changed
+test_changed:                  # used when gate_scope: changed, e.g. "pytest {files}"
+gate_lint_changed:             # blank = profile default (strict only); true/false to force
+gate_timeout:                  # seconds per gate command (requires the `timeout` tool)
+gate_max_blocks: 3             # after N blocks, stand down to avoid trapping the session
+gate_block_on_failure:         # blank = profile default; true/false to force
+
+# --- Protected paths (preToolUse guardrail) --------------------------------
+protect_off: false             # true disables path protection entirely
+protect_mode:                  # blank = profile default (warn in advisory, else deny)
+protect:                       # space-separated globs; blank = sensible defaults:
+                               #   lockfiles, .env, **/vendor/**, **/node_modules/**,
+                               #   **/dist/**, **/build/**, **/generated/**, .git/** ...
+
+# --- Misc ------------------------------------------------------------------
+exclude:                       # globs to skip for format/lint, e.g. **/migrations/**
+style_guide:                   # path (relative to repo root) to a style guide to follow
