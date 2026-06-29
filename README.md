@@ -49,6 +49,35 @@ and `AGENTS.md`), then walks through a real change where the framework keeps the
 rails — reusing existing patterns, fixing lint as it types, and **blocking a premature
 "done" on a failing test** until it's fixed. Start there if you want the 2-minute "why."
 
+## How is this different from `AGENTS.md`?
+
+They work at different layers, and they're complementary: **`AGENTS.md` tells the agent what
+to do; dev-framework verifies that it actually did it — and refuses work that doesn't measure
+up.** Instruction vs. enforcement; trust vs. verify.
+
+| | `AGENTS.md` / custom instructions | dev-framework |
+|---|---|---|
+| **Mechanism** | Passive prose injected into context | Deterministic hooks that run real tools |
+| **Compliance** | Probabilistic — the model *may* follow | Enforced — the gate *blocks* on failure |
+| **"Tests pass"** | The model can claim it (and hallucinate success) | `pytest` actually runs; truth is the exit code, not self-report |
+| **Over a long session** | Dilutes as context fills ("context rot") | Fires on every edit and at completion, regardless of context |
+| **Feedback** | Abstract rules | The *actual* lint/format/test output piped back at the moment it matters |
+| **Protected files** | Can ask nicely | Can *deny* the edit (`preToolUse`) |
+| **Style review** | One monolithic instruction blob | Specialist subagents, each in its own context window |
+
+The gap `AGENTS.md` can't close: it relies on the model *choosing* to follow instructions and
+*honestly reporting* results. Under context pressure an agent will skip the test, reinvent a
+helper, or say "done ✓" on red. dev-framework removes that trust assumption — the linter runs,
+the suite runs, and a failing gate physically stops completion.
+
+**It doesn't replace `AGENTS.md` — it enforces it.** Keep your prose conventions in
+`AGENTS.md` / `STYLE.md`; the framework injects them *and* makes them stick (see the
+[walkthrough](examples/todo-service/WALKTHROUGH.md)).
+
+When is `AGENTS.md` alone enough? For a strong model on a small task with no test suite, often
+yes. The framework earns its keep on long or autonomous sessions, large codebases, teams, and
+anywhere "did it *really* pass?" actually matters.
+
 ## Intensity profiles — the main dial
 
 One knob sets how hard the framework pushes. Set it per repo (`profile:` in
