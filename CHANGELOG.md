@@ -7,6 +7,7 @@ All notable changes to dev-framework are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`.github/PULL_REQUEST_TEMPLATE.md`** — contributor checklist (tests, validation, dormant-safe, docs).
 - **`AGENTS.md`** (root) — instructions for agents/contributors working on the framework
   itself: build/test/validate commands, repo map, must-follow conventions, hard-won gotchas,
   and the release process.
