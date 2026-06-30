@@ -9,10 +9,6 @@
 *.bak
 *.bak.*
 
-# Local per-repo activation file should NOT live in the framework repo root itself
-# (but example configs under examples/ are intentionally committed).
-/.dev-framework.yml
-
 # Python
 __pycache__/
 *.pyc

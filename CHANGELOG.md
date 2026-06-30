@@ -7,6 +7,11 @@ All notable changes to dev-framework are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`AGENTS.md`** (root) — instructions for agents/contributors working on the framework
+  itself: build/test/validate commands, repo map, must-follow conventions, hard-won gotchas,
+  and the release process.
+- **Dogfooding** — a committed root `.dev-framework.yml` so the project holds its own changes
+  to the same bar it ships (the completion gate runs the test suite + manifest validator).
 - **`examples/todo-service/`** — a worked example with a `WALKTHROUGH.md` showing how a
   project defines its conventions (`.dev-framework.yml` + `STYLE.md` + `AGENTS.md`) and how
   the framework keeps an agent on the rails through a real change.

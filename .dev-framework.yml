@@ -1,0 +1,12 @@
+# dev-framework dogfoods itself: this activates the framework for Copilot sessions working
+# on this repo, holding our own changes to the same bar we ship. Requires the plugin to be
+# installed (./install.sh); it is inert for contributors who don't have it. See AGENTS.md.
+
+profile: standard
+
+# The gate runs our test suite + manifest validation before a session may finish.
+test: bash tests/run.sh && python3 .github/scripts/validate-manifests.py
+typecheck:
+
+# format/lint auto-detect per file (shellcheck for *.sh, etc. — only if installed).
+style_guide: CONTRIBUTING.md
