@@ -30,11 +30,12 @@ jobs:
       - name: Validate JSON
         run: |
           for f in plugin.json .github/plugin/marketplace.json hooks/hooks.copilot.json \
-                   .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.claude.json; do
+                   .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.claude.json \
+                   .codex-plugin/plugin.json .agents/plugins/marketplace.json hooks/hooks.codex.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1])); print('ok', sys.argv[1])" "$f"
           done
 
-      - name: Validate manifests (Copilot CLI + Claude Code)
+      - name: Validate manifests (Copilot CLI + Claude Code + Codex CLI)
         run: python3 .github/scripts/validate-manifests.py
 
       - name: Run test suite

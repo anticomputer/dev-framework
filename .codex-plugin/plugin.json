@@ -1,0 +1,21 @@
+{
+  "name": "dev-framework",
+  "version": "0.2.0",
+  "description": "Agentic software-engineering discipline for Codex CLI: continuous style enforcement, anti-drift review, and test-grounded completion gates. Dormant until a session opts in.",
+  "author": {
+    "name": "anticomputer"
+  },
+  "repository": "https://github.com/anticomputer/dev-framework",
+  "license": "MIT",
+  "keywords": [
+    "codex-cli",
+    "code-review",
+    "style-guide",
+    "quality",
+    "testing",
+    "anti-drift",
+    "agentic"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.codex.json"
+}

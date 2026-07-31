@@ -1,8 +1,8 @@
 # `.dev-framework.yml` configuration reference
 
 `.dev-framework.yml` lives at the root of a repository. Its presence **activates** the
-framework for GitHub Copilot CLI *and* Claude Code sessions in that repo, and its keys
-configure behavior. One file covers both hosts — commit it to share identical enforcement
+framework for GitHub Copilot CLI, Claude Code, and Codex CLI sessions in that repo, and its
+keys configure behavior. One file covers all three hosts—commit it to share identical enforcement
 with your whole team, whichever CLI each member uses. Every key is optional — blank or
 absent values fall back to auto-detection or a profile default.
 
@@ -68,9 +68,10 @@ order (first match wins):
 3. If the file exists but sets no profile → `standard`.
 4. Otherwise → `off` (dormant).
 
-So `DEV_FRAMEWORK=strict copilot`, `DEV_FRAMEWORK=strict claude`, or `df strict` overrides
+So `DEV_FRAMEWORK=strict copilot`, `DEV_FRAMEWORK=strict claude`,
+`DEV_FRAMEWORK=strict codex`, or `df strict` overrides
 the committed profile for one session, and `DEV_FRAMEWORK=off` / `df off` forces a dormant
-session. Activation is identical on both hosts.
+session. Activation is identical on all three hosts.
 
 | Profile | Edit feedback | Completion gate | Protected paths |
 |---------|---------------|-----------------|-----------------|
@@ -111,7 +112,7 @@ tools that are actually installed. See the README "Language support" section for
 | `lint_on_edit` | `true` | Lint each edited file and feed violations back. |
 | `exclude` | — | Globs to skip for format/lint (e.g. `**/migrations/** **/*.min.js`). |
 
-### Completion gate (`agentStop` on Copilot CLI, `Stop` on Claude Code)
+### Completion gate (`agentStop` on Copilot CLI, `Stop` on Claude Code and Codex CLI)
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -137,7 +138,7 @@ tools that are actually installed. See the README "Language support" section for
 | Key | Default | Description |
 |-----|---------|-------------|
 | `style_guide` | auto-discover | Path (relative to repo root) to a style guide the agent should follow. If blank, common locations (`STYLE.md`, `CONTRIBUTING.md`, …) are auto-discovered. |
-| `host` | whichever CLI is installed (Copilot CLI wins when both are) | `copilot` or `claude` — which CLI the `df` wrapper launches by default in this repo. Purely a launcher convenience: the hooks and the gate behave the same under either host, so this never changes enforcement. Overridden by `$DF_HOST` and by `df claude` / `df copilot`. |
+| `host` | installed CLI preference: Copilot, Claude, Codex | `copilot`, `claude`, or `codex`—which CLI the `df` wrapper launches by default in this repo. Purely a launcher convenience: hooks and gates behave the same under every host. Overridden by `$DF_HOST` and an explicit `df <host>`. |
 
 ---
 
@@ -179,11 +180,11 @@ protect: .env .env.* **/node_modules/**   # narrower than the defaults
 # or: protect_off: true
 ```
 
-**A team standardized on Claude Code**
+**A team standardized on Codex CLI**
 
 ```yaml
 profile: standard
-host: claude          # `df` launches Claude Code here; plain `claude` works too
+host: codex           # `df` launches Codex CLI here; plain `codex` works too
 test: pytest -q
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agentStop (Copilot CLI) / Stop (Claude Code) hook: the completion gate. When active
+# agentStop (Copilot CLI) / Stop (Claude Code and Codex CLI) hook: the completion gate. When active
 # (standard/strict), run the repo's type-check + tests (and, in strict, lint on changed
 # files) before the agent may finish; block on failure and feed the output back. In
 # advisory profile it reports without blocking. Skips entirely when the session changed

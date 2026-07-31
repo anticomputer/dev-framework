@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Shared helpers for dev-framework hooks and the `df` CLI. SOURCED, not run directly.
-# Hook scripts receive $PLUGIN_ROOT/$COPILOT_PROJECT_DIR from the Copilot CLI, or
-# $CLAUDE_PLUGIN_ROOT/$CLAUDE_PROJECT_DIR/$CLAUDE_PLUGIN_DATA from Claude Code.
+# Hook scripts receive host-specific plugin, project, and writable-data paths.
 
 # Default set of paths the preToolUse guardrail protects from edits.
 DF_DEFAULT_PROTECT='*.lock package-lock.json pnpm-lock.yaml yarn.lock bun.lockb Cargo.lock poetry.lock Gemfile.lock composer.lock go.sum .env .env.* **/vendor/** **/node_modules/** **/dist/** **/build/** **/generated/** **/*.generated.* **/*.min.js .git/**'
 
 # ---- host (which agent CLI are we running under?) --------------------------
-# `copilot` (GitHub Copilot CLI) or `claude` (Claude Code). Both are first-class: the
+# `copilot` (GitHub Copilot CLI), `claude` (Claude Code), or `codex` (Codex CLI). All are first-class: the
 # hook scripts are shared, and only the manifests, hook-event names, and a few banner
 # details differ.
 
-# df_normalize_host NAME -> claude | copilot | "" (unrecognized). The single alias table.
+# df_normalize_host NAME -> claude | copilot | codex | "" (unrecognized). The single alias table.
 df_normalize_host() {
   case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     claude|claude-code|cc) printf 'claude' ;;
     copilot|copilot-cli)   printf 'copilot' ;;
+    codex|openai-codex)    printf 'codex' ;;
   esac
 }
 
@@ -33,13 +33,25 @@ df_host() {
 
 # Human-facing name of a host CLI, and the binary that launches it. Both default to the
 # host of the current session; pass a host name to ask about a specific one.
-df_host_label() { [ "${1:-$(df_host)}" = claude ] && printf 'Claude Code' || printf 'Copilot CLI'; }
-df_host_bin()   { [ "${1:-$(df_host)}" = claude ] && printf 'claude'      || printf 'copilot'; }
+df_host_label() {
+  case "${1:-$(df_host)}" in claude) printf 'Claude Code' ;; codex) printf 'Codex CLI' ;; *) printf 'Copilot CLI' ;; esac
+}
+df_host_bin() {
+  case "${1:-$(df_host)}" in claude) printf 'claude' ;; codex) printf 'codex' ;; *) printf 'copilot' ;; esac
+}
 
-# Claude Code namespaces plugin agents and skills as `<plugin>:<name>`; Copilot CLI
-# exposes them bare. Use these when telling the agent what to invoke.
-df_agent_ref() { [ "$(df_host)" = claude ] && printf 'dev-framework:%s' "$1" || printf '%s' "$1"; }
-df_skill_ref() { [ "$(df_host)" = claude ] && printf 'dev-framework:%s' "$1" || printf '%s' "$1"; }
+# Claude Code and Codex namespace plugin components; Copilot CLI exposes them bare.
+# Use these when telling the agent what to invoke.
+df_agent_ref() {
+  case "$(df_host)" in
+    claude) printf 'dev-framework:%s' "$1" ;;
+    codex) printf 'dev_framework_%s' "$(printf '%s' "$1" | tr '-' '_')" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+df_skill_ref() {
+  case "$(df_host)" in claude|codex) printf 'dev-framework:%s' "$1" ;; *) printf '%s' "$1" ;; esac
+}
 
 # ---- locations ------------------------------------------------------------
 
@@ -51,10 +63,12 @@ df_config_file() {
   printf '%s' "$(df_project_root)/.dev-framework.yml"
 }
 
-# Writable scratch dir for per-session state. Both CLIs hand plugins a persistent
+# Writable scratch dir for per-session state. All CLIs hand plugins a persistent
 # data dir; outside them we keep our own subdirectory rather than littering /tmp.
 df_data_dir() {
-  local d="${COPILOT_PLUGIN_DATA:-${CLAUDE_PLUGIN_DATA:-}}"
+  local d
+  if [ "$(df_host)" = codex ]; then d="${PLUGIN_DATA:-}"
+  else d="${COPILOT_PLUGIN_DATA:-${CLAUDE_PLUGIN_DATA:-}}"; fi
   [ -n "$d" ] || d="${TMPDIR:-/tmp}/dev-framework"
   mkdir -p "$d" 2>/dev/null || true
   printf '%s' "$d"
@@ -383,10 +397,10 @@ df_apply_files() {
 }
 
 # ---- output protocol ------------------------------------------------------
-# Both CLIs read a JSON verdict on stdout, but Claude Code discriminates
+# All three CLIs read a JSON verdict on stdout, but Claude Code discriminates
 # `hookSpecificOutput` on `hookEventName` and ignores the block without it. Each
-# payload below is the union of both dialects: the event name is echoed back from
-# the request (`sessionStart` under Copilot, `SessionStart` under Claude Code), and
+# payload below is the union of their dialects: the event name is echoed back from
+# the request (`sessionStart` under Copilot, `SessionStart` under Claude Code and Codex), and
 # the fields each host doesn't recognize are simply ignored by it.
 
 # Event name for the hook currently running: from the request payload, else the
@@ -459,13 +473,39 @@ print(cur if isinstance(cur, str) else json.dumps(cur))
 PY
 }
 
-# Path of the file an edit/create tool call targets, across both CLIs' tool schemas:
-# `path` (Copilot edit/create), `file_path` (Edit/Write/MultiEdit), `notebook_path`
-# (NotebookEdit). Empty when the call doesn't name a file.
-df_tool_file() {
-  local key val
-  for key in path file_path notebook_path; do
-    val="$(df_json_get "tool_input.$key")"
-    [ -n "$val" ] && { printf '%s' "$val"; return; }
-  done
+# Paths targeted by edit/create tool calls across all host schemas. Empty when the call
+# doesn't name a file. The singular helper returns the first path for compatibility.
+df_tool_files() {
+  DF_JSON="${DF_STDIN:-}" python3 <<'PY'
+import json, os
+try:
+    data = json.loads(os.environ.get("DF_JSON", "") or "{}")
+except Exception:
+    data = {}
+tool_input = data.get("tool_input") if isinstance(data, dict) else None
+tool_input = tool_input if isinstance(tool_input, dict) else {}
+paths = []
+for key in ("path", "file_path", "notebook_path"):
+    value = tool_input.get(key)
+    if isinstance(value, str) and value:
+        paths.append(value)
+if data.get("tool_name") == "apply_patch":
+    command = tool_input.get("command")
+    if isinstance(command, str):
+        prefixes = ("*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: ")
+        for line in command.splitlines():
+            for prefix in prefixes:
+                if line.startswith(prefix):
+                    value = line[len(prefix):].strip()
+                    if value:
+                        paths.append(value)
+                    break
+seen = set()
+for path in paths:
+    if path not in seen:
+        seen.add(path)
+        print(path)
+PY
 }
+
+df_tool_file() { df_tool_files | head -n 1; }

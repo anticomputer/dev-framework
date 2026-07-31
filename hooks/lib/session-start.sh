@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sessionStart (Copilot CLI) / SessionStart (Claude Code) hook: when active, inject a
+# sessionStart (Copilot CLI) / SessionStart (Claude Code and Codex CLI) hook: when active, inject a
 # profile-aware ACTIVE banner with this repo's tooling and the working-loop directives.
 # No-op when the profile is off.
 set -uo pipefail
@@ -38,22 +38,41 @@ else
   done
 fi
 
-# Name the specialists the way THIS host expects them to be invoked: Claude Code
-# namespaces plugin agents and skills as `dev-framework:<name>`, Copilot CLI does not.
+# Name specialists and skills the way this host expects them to be invoked.
 guardian="$(df_agent_ref pattern-guardian)"
 enforcer="$(df_agent_ref style-enforcer)"
 grounder="$(df_agent_ref test-grounder)"
-if [ "$(df_host)" = claude ]; then
+case "$(df_host)" in
+claude)
   delegation="Delegate to them with the Task tool, passing the namespaced name as
 \`subagent_type\`. The bundled skills are \`/$(df_skill_ref peer-review)\`,
 \`/$(df_skill_ref ground-in-tests)\`, and \`/$(df_skill_ref match-patterns)\`. For a
 general second opinion, spawn a plain subagent with a review brief."
-else
+  ;;
+codex)
+  peer="$(df_skill_ref peer-review)"
+  tests="$(df_skill_ref ground-in-tests)"
+  patterns="$(df_skill_ref match-patterns)"
+  codex_agents="${CODEX_HOME:-}"
+  [ -n "$codex_agents" ] || codex_agents="${HOME:-}/.codex"
+  codex_agents="$codex_agents/agents"
+  if [ -f "$codex_agents/dev-framework-pattern-guardian.toml" ] &&
+     [ -f "$codex_agents/dev-framework-style-enforcer.toml" ] &&
+     [ -f "$codex_agents/dev-framework-test-grounder.toml" ]; then
+    delegation="Delegate reviews to \`$guardian\`, \`$enforcer\`, and \`$grounder\`. The bundled skills are
+\`\$$peer\`, \`\$$tests\`, and \`\$$patterns\`."
+  else
+    delegation="Use a built-in \`explorer\` or \`default\` subagent with a focused review brief. The bundled skills are
+\`\$$peer\`, \`\$$tests\`, and \`\$$patterns\`. The optional named dev-framework agents are installed by \`./install.sh codex\`."
+  fi
+  ;;
+*)
   delegation="Delegate to them as subagents. The bundled skills are
 \`$(df_skill_ref peer-review)\`, \`$(df_skill_ref ground-in-tests)\`, and
 \`$(df_skill_ref match-patterns)\`. The built-in \`code-review\` and \`rubber-duck\`
 agents are also available for a general second opinion."
-fi
+  ;;
+esac
 
 banner="DEV-FRAMEWORK: ACTIVE (profile: ${profile}, host: $(df_host_label)).
 
