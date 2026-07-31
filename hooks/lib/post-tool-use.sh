@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# postToolUse hook: after the agent edits/creates a file, record that an edit happened
-# (so the gate knows the session changed something), then auto-format and lint the file,
-# feeding violations back. Respects `exclude:` globs. No-op when the profile is off.
+# postToolUse (Copilot CLI) / PostToolUse (Claude Code) hook: after the agent
+# edits/creates a file, record that an edit happened (so the gate knows the session
+# changed something), then auto-format and lint the file, feeding violations back.
+# Respects `exclude:` globs. No-op when the profile is off.
 set -uo pipefail
 . "$(dirname "$0")/common.sh"
+DF_EVENT=PostToolUse
 
 df_active || exit 0
 df_read_stdin
 
-file="$(df_json_get tool_input.path)"
-[ -n "$file" ] || file="$(df_json_get tool_input.file_path)"
+file="$(df_tool_file)"
 [ -n "$file" ] || exit 0
 
 case "$file" in

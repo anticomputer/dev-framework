@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# sessionStart hook: when active, inject a profile-aware ACTIVE banner with this repo's
-# tooling and the working-loop directives. No-op when the profile is off.
+# sessionStart (Copilot CLI) / SessionStart (Claude Code) hook: when active, inject a
+# profile-aware ACTIVE banner with this repo's tooling and the working-loop directives.
+# No-op when the profile is off.
 set -uo pipefail
 . "$(dirname "$0")/common.sh"
+DF_EVENT=SessionStart
 
 df_active || exit 0
+df_read_stdin
 profile="$(df_profile)"
 root="$(df_project_root)"
 fw_root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -35,14 +38,32 @@ else
   done
 fi
 
-banner="DEV-FRAMEWORK: ACTIVE (profile: ${profile}).
+# Name the specialists the way THIS host expects them to be invoked: Claude Code
+# namespaces plugin agents and skills as `dev-framework:<name>`, Copilot CLI does not.
+guardian="$(df_agent_ref pattern-guardian)"
+enforcer="$(df_agent_ref style-enforcer)"
+grounder="$(df_agent_ref test-grounder)"
+if [ "$(df_host)" = claude ]; then
+  delegation="Delegate to them with the Task tool, passing the namespaced name as
+\`subagent_type\`. The bundled skills are \`/$(df_skill_ref peer-review)\`,
+\`/$(df_skill_ref ground-in-tests)\`, and \`/$(df_skill_ref match-patterns)\`. For a
+general second opinion, spawn a plain subagent with a review brief."
+else
+  delegation="Delegate to them as subagents. The bundled skills are
+\`$(df_skill_ref peer-review)\`, \`$(df_skill_ref ground-in-tests)\`, and
+\`$(df_skill_ref match-patterns)\`. The built-in \`code-review\` and \`rubber-duck\`
+agents are also available for a general second opinion."
+fi
+
+banner="DEV-FRAMEWORK: ACTIVE (profile: ${profile}, host: $(df_host_label)).
 
 ${posture}
 
 Work to the dev-framework discipline set out in the CONSTITUTION below: clear the
 quality bar, match existing codebase patterns (do not re-invent helpers or add a second
 way to do a thing), and ground every claim in tests you actually run. Use the
-pattern-guardian, style-enforcer, and test-grounder agents as your default working loop.
+${guardian}, ${enforcer}, and ${grounder} agents as your default working loop.
+${delegation}
 
 This repo's verification tooling:
 - Tests: ${test_cmd:-<none detected — set \`test:\` in .dev-framework.yml or run \`df init\`>}

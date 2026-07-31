@@ -6,5 +6,5 @@
 - Use `TodoStore` for all todo operations; don't introduce parallel state.
 - Behavioral changes need a test under `tests/`.
 
-(These are ordinary Copilot custom instructions. The dev-framework adds enforcement on
-top of them — see ../../README.md.)
+(These are ordinary custom instructions — `AGENTS.md` is read by Copilot CLI and Claude
+Code alike. The dev-framework adds enforcement on top of them — see ../../README.md.)

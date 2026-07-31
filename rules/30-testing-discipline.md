@@ -27,8 +27,9 @@ success blind.
 
 ## The completion gate
 
-When the framework is active, an `agentStop` hook runs the project's type-check and
-test commands before you are allowed to finish. If it blocks you with failures:
+When the framework is active, a completion hook (`agentStop` on Copilot CLI, `Stop` on
+Claude Code) runs the project's type-check and test commands before you are allowed to
+finish. If it blocks you with failures:
 
 - **Do not** try to disable the gate, weaken the assertion, or mark the test skipped to
   get past it.

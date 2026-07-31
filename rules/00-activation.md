@@ -1,9 +1,10 @@
 # Dev-Framework — Activation Gate
 
-You are running with the **dev-framework** plugin installed. This framework enforces
-disciplined software engineering: a quality bar, close style-guide adherence,
-continuous peer review to prevent code fragmentation and drift, and test-grounded
-completion.
+You are running with the **dev-framework** plugin installed (it ships for both GitHub
+Copilot CLI and Claude Code; the session banner names the host you're on). This
+framework enforces disciplined software engineering: a quality bar, close style-guide
+adherence, continuous peer review to prevent code fragmentation and drift, and
+test-grounded completion.
 
 ## When these rules apply
 

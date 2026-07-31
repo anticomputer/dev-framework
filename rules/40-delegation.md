@@ -7,7 +7,9 @@ rubber-stamp. Catching issues early is cheaper than catching them at the gate.
 ## The specialists
 
 Invoke these as subagents (delegate the task to them; they investigate and report,
-they do **not** edit code):
+they do **not** edit code). The session banner tells you the exact names to invoke on
+this host — Claude Code namespaces them as `dev-framework:<name>`, Copilot CLI exposes
+them bare:
 
 - **`pattern-guardian`** — checks new/changed code against existing codebase patterns:
   duplication, re-invented helpers, divergent conventions, "second way to do a thing",
@@ -20,19 +22,20 @@ they do **not** edit code):
   test that fails without the change? do the cited commands actually pass? did you
   verify the edge cases? Use it before declaring a task done.
 
-You may also use the built-in **`code-review`** and **`rubber-duck`** agents for a
-general high-signal second opinion — the best moment is after planning, before
-implementing, and again before completion.
+For a general high-signal second opinion, use whatever generalist reviewer your host
+offers — the built-in **`code-review`** and **`rubber-duck`** agents on Copilot CLI, or a
+plain subagent given a review brief on Claude Code. The best moments are after planning,
+before implementing, and again before completion.
 
 ## When to delegate (default cadence)
 
-1. **After planning, before implementing** a non-trivial change → `rubber-duck` for a
-   design sanity check.
+1. **After planning, before implementing** a non-trivial change → a generalist reviewer
+   for a design sanity check.
 2. **While implementing**, before adding any new helper/abstraction/dependency →
    quick `pattern-guardian` check that you're not duplicating or diverging.
 3. **After a batch of edits** → `style-enforcer` on the changed files.
 4. **Before declaring done** → `test-grounder` (evidence) and a final
-   `pattern-guardian` / `code-review` pass; resolve every blocking item.
+   `pattern-guardian` / code-review pass; resolve every blocking item.
 
 Keep delegation proportional: a one-line fix doesn't need the full loop; a new module
 does. Use judgment, but never skip the test-grounding and review steps for behavioral
@@ -41,8 +44,9 @@ changes.
 ## Skills
 
 For explicit, repeatable workflows you can invoke the bundled skills:
-**`peer-review`**, **`ground-in-tests`**, and **`match-patterns`**. They codify the
-steps above so you run them consistently.
+**`peer-review`**, **`ground-in-tests`**, and **`match-patterns`** (on Claude Code they
+are namespaced: `/dev-framework:peer-review`, and so on). They codify the steps above so
+you run them consistently.
 
 ## Acting on feedback
 

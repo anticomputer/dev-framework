@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "dev-framework",
+  "displayName": "dev-framework",
+  "description": "Agentic software-engineering discipline for Claude Code: always-on quality bar, continuous style enforcement, anti-drift peer review, and test-grounded completion gates. Dormant until a session opts in (DEV_FRAMEWORK=1 or a .dev-framework.yml in the repo).",
+  "version": "0.2.0",
+  "author": {
+    "name": "anticomputer"
+  },
+  "repository": "https://github.com/anticomputer/dev-framework",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "code-review",
+    "style-guide",
+    "quality",
+    "testing",
+    "anti-drift",
+    "agentic"
+  ],
+  "hooks": "./hooks/hooks.claude.json"
+}
