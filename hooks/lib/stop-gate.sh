@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# agentStop hook: the completion gate. When active (standard/strict), run the repo's
-# type-check + tests (and, in strict, lint on changed files) before the agent may finish;
-# block on failure and feed the output back. In advisory profile it reports without
-# blocking. Skips entirely when the session changed no files. No-op when off.
+# agentStop (Copilot CLI) / Stop (Claude Code and Codex CLI) hook: the completion gate. When active
+# (standard/strict), run the repo's type-check + tests (and, in strict, lint on changed
+# files) before the agent may finish; block on failure and feed the output back. In
+# advisory profile it reports without blocking. Skips entirely when the session changed
+# no files. No-op when off.
 set -uo pipefail
 . "$(dirname "$0")/common.sh"
+DF_EVENT=Stop
 
 df_active || exit 0
 df_read_stdin

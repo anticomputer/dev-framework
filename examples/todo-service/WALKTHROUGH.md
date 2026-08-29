@@ -1,7 +1,9 @@
 # Walkthrough: keeping an agent on the rails
 
-This tiny project shows the whole loop: **define your conventions once, then let a Copilot
+This tiny project shows the whole loop: **define your conventions once, then let an agent
 session implement a change while the dev-framework keeps it consistent, clean, and tested.**
+Everything below is identical under GitHub Copilot CLI, Claude Code, and Codex CLI—the rails are the
+same, only the hook event names differ.
 
 The example is a dependency-free in-memory todo store
 ([`src/todos.py`](src/todos.py)) with a couple of tests.
@@ -14,7 +16,7 @@ Three files encode "how we work here":
 |------|------|
 | [`.dev-framework.yml`](.dev-framework.yml) | Profile + commands + where the style guide lives. Its presence activates the framework for sessions in this repo. |
 | [`STYLE.md`](STYLE.md) | The conventions (use `TodoStore`, raise `KeyError` for missing ids, tests required, ruff format/lint). Injected into every session via `style_guide:`. |
-| [`AGENTS.md`](AGENTS.md) | Ordinary Copilot custom instructions. The framework adds *enforcement* on top. |
+| [`AGENTS.md`](AGENTS.md) | Ordinary custom instructions, read by all hosts. The framework adds *enforcement* on top. |
 
 ```yaml
 # .dev-framework.yml
@@ -31,16 +33,21 @@ Commit these and your whole team gets identical guardrails — no per-person set
 
 ```bash
 cd examples/todo-service
-df            # launches copilot with the framework active (or just `copilot`, since the
-              # committed .dev-framework.yml activates it)
+df            # launches your CLI with the framework active — or `copilot` / `claude` / `codex`,
+              # since the committed .dev-framework.yml activates it either way
+df claude     # …or name the host explicitly
+df codex
 ```
 
-At `sessionStart` the framework injects the rails into the agent's context:
+At session start the framework injects the rails into the agent's context:
 
 ```
-DEV-FRAMEWORK: ACTIVE (profile: standard).
+DEV-FRAMEWORK: ACTIVE (profile: standard, host: Claude Code).
 STANDARD — formatting/lint feedback is inline; the completion gate runs type-check + tests
 and BLOCKS finishing while they are red; protected paths cannot be edited.
+...
+Use the dev-framework:pattern-guardian, dev-framework:style-enforcer, and
+dev-framework:test-grounder agents as your default working loop.
 ...
 This repo's verification tooling:
 - Tests: pytest -q
@@ -51,6 +58,16 @@ This repo's verification tooling:
 ============================ DEV-FRAMEWORK CONSTITUTION ============================
 ... quality bar · match existing patterns · testing discipline · delegation loop ...
 ```
+
+Under Copilot CLI the banner is the same except it reads `host: Copilot CLI` and names the
+specialists bare (`pattern-guardian`, …), because Copilot doesn't namespace plugin
+components. The agent is told the right names for its host, so the delegation loop just
+works.
+
+Under Codex CLI it reads `host: Codex CLI`, names the bundled skills as
+`$dev-framework:peer-review` and its peers, and uses either the installer-provided
+`dev_framework_*` specialists or a built-in `explorer`/`default` fallback. Review the plugin
+hooks with `/hooks` after installing them.
 
 ## 3. Ask for a change
 
@@ -71,7 +88,7 @@ anything new it delegates a quick check:
 ### b) Formatting and lint are fixed as it types
 
 The agent writes `delete()` with an unused import. The moment it saves the file, the
-`postToolUse` hook runs and feeds the result straight back:
+post-edit hook (`postToolUse` / `PostToolUse`) runs and feeds the result straight back:
 
 ```
 dev-framework — post-edit check on src/todos.py:
@@ -100,8 +117,8 @@ def delete(self, todo_id: int) -> None:
     self._items.pop(todo_id, None)   # silently ignores missing ids — violates STYLE.md
 ```
 
-The agent thinks it's finished and tries to end the session. The `agentStop` **completion
-gate** runs the suite and refuses:
+The agent thinks it's finished and tries to end the session. The **completion gate**
+(`agentStop` on Copilot CLI, `Stop` on Claude Code and Codex CLI) runs the suite and refuses:
 
 ```
 dev-framework completion gate — you cannot finish yet. The repo's checks are failing:
@@ -127,11 +144,12 @@ proves the behavior.
 
 | Safeguard | What it prevented |
 |-----------|-------------------|
-| `style_guide` + constitution injected at `sessionStart` | The agent knew your conventions before writing a line. |
+| `style_guide` + constitution injected at session start | The agent knew your conventions before writing a line. |
 | `pattern-guardian` + match-existing-patterns rule | A second store / divergent state (codebase drift). |
-| `postToolUse` format + lint | Style and lint debt landing in the diff. |
-| `agentStop` gate (`profile: standard`) | A premature "done" on code with a failing test. |
+| Post-edit format + lint | Style and lint debt landing in the diff. |
+| The completion gate (`profile: standard`) | A premature "done" on code with a failing test. |
 
-Nothing here was bespoke to this repo's tooling — point the framework at a Node, Go, Rust,
-or polyglot project and the same loop runs with that stack's formatter, linter, and test
-command. Set `profile: advisory` if you want all of this as *feedback* without the hard gate.
+Nothing here was bespoke to this repo's tooling *or to one CLI* — point the framework at a
+Node, Go, Rust, or polyglot project and the same loop runs with that stack's formatter,
+linter, and test command, under whichever host the developer prefers. Set
+`profile: advisory` if you want all of this as *feedback* without the hard gate.

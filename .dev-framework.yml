@@ -1,6 +1,7 @@
-# dev-framework dogfoods itself: this activates the framework for Copilot sessions working
-# on this repo, holding our own changes to the same bar we ship. Requires the plugin to be
-# installed (./install.sh); it is inert for contributors who don't have it. See AGENTS.md.
+# dev-framework dogfoods itself: this activates the framework for Copilot CLI and Claude Code
+# sessions working on this repo, holding our own changes to the same bar we ship. Requires the
+# plugin to be installed (./install.sh); it is inert for contributors who don't have it.
+# See AGENTS.md.
 
 profile: standard
 

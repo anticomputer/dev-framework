@@ -1,0 +1,20 @@
+{
+  "name": "dev-framework",
+  "interface": {
+    "displayName": "dev-framework"
+  },
+  "plugins": [
+    {
+      "name": "dev-framework",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

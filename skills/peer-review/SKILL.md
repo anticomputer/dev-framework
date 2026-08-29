@@ -2,9 +2,9 @@
 name: peer-review
 description: >
   Run a continuous-peer-review pass over the current changes to prevent fragmentation
-  and drift before completion. Orchestrates the pattern-guardian, style-enforcer, and
-  built-in code-review agents, then consolidates only the blocking items. Use after a
-  batch of edits and before declaring a non-trivial change done.
+  and drift before completion. Orchestrates the pattern-guardian and style-enforcer
+  specialists plus a general code-review pass, then consolidates only the blocking
+  items. Use after a batch of edits and before declaring a non-trivial change done.
 ---
 
 # Peer Review Pass
@@ -28,13 +28,16 @@ user asks for a review of the current changes.
    If there is nothing to review, say so and stop.
 
 2. **Run the specialists in parallel.** Delegate each as a subagent, giving each the
-   diff scope and the relevant file paths:
+   diff scope and the relevant file paths. On Claude Code the specialists are namespaced
+   — pass `dev-framework:pattern-guardian` and `dev-framework:style-enforcer` as the
+   subagent type; on Copilot CLI use the bare names:
    - **pattern-guardian** — duplication, re-invented helpers, divergent conventions, a
      second way to do a thing, unjustified new dependencies.
    - **style-enforcer** — adherence to the project style guide / lint config / local
      conventions on the changed files.
-   - **code-review** (built-in) — bugs, logic errors, security, resource/concurrency
-     issues. High bar, high signal only.
+   - **code review** — bugs, logic errors, security, resource/concurrency issues. Use
+     the built-in `code-review` agent on Copilot CLI, or a plain subagent briefed to do
+     the same on Claude Code. High bar, high signal only.
 
 3. **Consolidate.** Merge their findings. Drop duplicates and anything non-actionable.
    Group by severity: **Blocking**, **Should-fix**, **Note**.

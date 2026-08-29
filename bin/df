@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# df — control and launch Copilot CLI with the dev-framework.
+# df — control and launch an agent CLI with the dev-framework.
 #
-#   df [copilot args...]      launch copilot with the framework active (honors a repo's
-#                             .dev-framework.yml profile; defaults to `standard`)
+#   df [args...]              launch the default host with the framework active (honors a
+#                             repo's .dev-framework.yml profile; defaults to `standard`)
+#   df claude / df copilot / df codex [args...]   launch a specific host
 #   df strict   [args...]     launch in strict profile   (hard gate; deny protected edits)
 #   df standard [args...]     launch in standard profile (gate blocks on test/type fails)
 #   df advisory [args...]     launch in advisory profile (feedback only; never blocks)
 #   df off      [args...]     launch with the framework dormant
 #   df init [--force] [--profile P]   write a tailored .dev-framework.yml for this repo
-#   df status                 show the resolved profile and detected tooling here
+#   df status                 show the resolved host, profile, and detected tooling here
 #   df help                   show this help
+#
+# A host and a profile can be combined in either order:  df codex strict  /  df strict claude
+# Host precedence: command-line word > $DF_HOST > `host:` in .dev-framework.yml >
+# whichever CLI is installed (Copilot CLI, then Claude Code, then Codex CLI).
 set -euo pipefail
 
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,28 +25,55 @@ df_root_for_cwd() {
   git rev-parse --show-toplevel 2>/dev/null || pwd
 }
 
-launch() { # PROFILE_OR_EMPTY  args...
-  local prof="$1"; shift || true
-  command -v copilot >/dev/null 2>&1 || { echo "df: 'copilot' not found on PATH." >&2; exit 127; }
+host_present() { command -v "$(df_host_bin "$1")" >/dev/null 2>&1; }
+
+# Resolve the host to launch: explicit word, then $DF_HOST, then the repo's `host:`,
+# then whatever is installed.
+resolve_host() { # EXPLICIT_OR_EMPTY
+  local want root h
+  want="$(df_normalize_host "$1")"
+  [ -n "$want" ] && { printf '%s' "$want"; return; }
+  h="$(df_normalize_host "${DF_HOST:-}")"
+  [ -n "$h" ] && { printf '%s' "$h"; return; }
+  root="$(df_root_for_cwd)"
+  h="$(df_normalize_host "$(COPILOT_PROJECT_DIR="$root" bash -c ". \"$FW/hooks/lib/common.sh\"; df_cfg host ''")")"
+  [ -n "$h" ] && { printf '%s' "$h"; return; }
+  if host_present copilot; then printf 'copilot'
+  elif host_present claude; then printf 'claude'
+  elif host_present codex; then printf 'codex'
+  else printf 'copilot'; fi
+}
+
+launch() { # HOST  PROFILE_OR_EMPTY  args...
+  local host="$1" prof="$2"; shift 2 || true
+  local bin; bin="$(df_host_bin "$host")"
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "df: '$bin' not found on PATH (host: $host)." >&2
+    host_present copilot && echo "df: 'copilot' is installed — try: df copilot" >&2
+    host_present claude  && echo "df: 'claude' is installed — try: df claude" >&2
+    host_present codex   && echo "df: 'codex' is installed — try: df codex" >&2
+    exit 127
+  fi
   if [ -n "$prof" ]; then
-    DEV_FRAMEWORK="$prof" exec copilot "$@"
+    DEV_FRAMEWORK="$prof" exec "$bin" "$@"
   else
     # No explicit profile: honor a repo .dev-framework.yml if present, else default on.
     local root; root="$(df_root_for_cwd)"
-    if [ -f "$root/.dev-framework.yml" ]; then exec copilot "$@"
-    else DEV_FRAMEWORK="standard" exec copilot "$@"; fi
+    if [ -f "$root/.dev-framework.yml" ]; then exec "$bin" "$@"
+    else DEV_FRAMEWORK="standard" exec "$bin" "$@"; fi
   fi
 }
 
-cmd_status() {
-  local root; root="$(df_root_for_cwd)"
-  COPILOT_PROJECT_DIR="$root" DEV_FRAMEWORK="${DEV_FRAMEWORK:-}" bash -c '
+cmd_status() { # HOST
+  local root host; root="$(df_root_for_cwd)"; host="$1"
+  COPILOT_PROJECT_DIR="$root" DEV_FRAMEWORK="${DEV_FRAMEWORK:-}" DF_HOST="$host" bash -c '
     . "'"$FW"'/hooks/lib/common.sh"
     cfg="$(df_config_file)"
     echo "dev-framework status"
     echo "  repo root        : '"$root"'"
     if [ -f "$cfg" ]; then echo "  config           : $cfg (present)"
     else echo "  config           : none (.dev-framework.yml absent — run: df init)"; fi
+    echo "  host             : $(df_host_label)   (launches: $(df_host_bin))"
     echo "  resolved profile : $(df_profile)   (DEV_FRAMEWORK='\''${DEV_FRAMEWORK:-}'\'')"
     echo "  tests            : $(df_cfg test "$(df_detect_test)")"
     echo "  type-check       : $(df_cfg typecheck "$(df_detect_typecheck)")"
@@ -59,6 +91,13 @@ cmd_status() {
     done
     [ -n "$any" ] || echo "    (no formatters/linters detected for the file types here — install tools or set format/lint)"
   '
+  printf '  CLIs installed   :'
+  local found=""
+  host_present copilot && { printf ' copilot'; found=1; }
+  host_present claude  && { printf ' claude'; found=1; }
+  host_present codex   && { printf ' codex'; found=1; }
+  [ -n "$found" ] || printf ' <none — install Copilot CLI, Claude Code, or Codex CLI>'
+  printf '\n'
 }
 
 cmd_init() {
@@ -83,8 +122,8 @@ cmd_init() {
     pc="auto"; df_precommit_active && pc="auto (pre-commit detected — handles per-file format+lint)"
   cat > "'"$cfg"'" <<YML
 # .dev-framework.yml — generated by \`df init\`. Edit freely; all keys are optional.
-# Presence of this file activates the framework for Copilot sessions in this repo.
-# File types seen here: ${langs}
+# Presence of this file activates the framework for Copilot CLI, Claude Code, and Codex CLI
+# sessions in this repo. File types seen here: ${langs}
 
 # Intensity: off | advisory | standard | strict
 #   advisory = feedback only, never blocks   standard = gate blocks on failing tests
@@ -119,24 +158,41 @@ gate_max_blocks: 3
 protect_off: false
 
 # --- Misc ------------------------------------------------------------------
+# host:         # copilot | claude | codex — which CLI \`df\` launches by default here
 # exclude:      # globs to skip for format/lint (e.g. **/migrations/**)
 # style_guide:  # path to a style guide to follow (auto-discovered if blank)
 YML
   '
   echo "Wrote $cfg (profile: $prof). Detected: test='$(COPILOT_PROJECT_DIR="$root" bash -c ". \"$FW/hooks/lib/common.sh\"; df_detect_test")'."
-  echo "Review it, then start a session in this repo with:  copilot   (or: df)"
+  echo "Review it, then start a session in this repo with:  df   (or plain \`copilot\` / \`claude\` / \`codex\`)"
 }
 
-case "${1:-}" in
-  ""|run)            shift || true; launch "" "$@" ;;
-  strict|standard|advisory|off)
-                     prof="$1"; shift; launch "$prof" "$@" ;;
-  on)                shift; launch "standard" "$@" ;;
-  init)              shift; cmd_init "$@" ;;
-  status)            cmd_status ;;
-  version|--version|-v)
-                     v="$(python3 -c "import json;print(json.load(open('$FW/plugin.json'))['version'])" 2>/dev/null || echo '?')"
-                     echo "dev-framework $v" ;;
-  help|-h|--help)    sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
-  *)                 launch "" "$@" ;;   # treat unknown leading arg as copilot args
-esac
+# ---- argument parsing -------------------------------------------------------
+# Leading words may name a host and/or a profile, in either order. The first word we
+# don't recognize ends framework parsing; everything from there on goes to the CLI.
+host=""; profile=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    claude|copilot|codex)               host="$1" ;;
+    --host)                             shift; host="${1:-}" ;;
+    --host=*)                           host="${1#--host=}" ;;
+    strict|standard|advisory|off)       profile="$1" ;;
+    on)                                 profile="standard" ;;
+    run)                                : ;;
+    init)                               shift; cmd_init "$@"; exit 0 ;;
+    status)                             shift; cmd_status "$(resolve_host "$host")"; exit 0 ;;
+    version|--version|-v)
+      v="$(python3 -c "import json;print(json.load(open('$FW/plugin.json'))['version'])" 2>/dev/null || echo '?')"
+      echo "dev-framework $v"; exit 0 ;;
+    help|-h|--help)
+      sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *)                                  break ;;
+  esac
+  shift
+done
+
+if [ -n "$host" ] && [ -z "$(df_normalize_host "$host")" ]; then
+  echo "df: unknown host '$host' (expected: claude | copilot | codex)" >&2; exit 2
+fi
+
+launch "$(resolve_host "$host")" "$profile" "$@"

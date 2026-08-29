@@ -1,9 +1,10 @@
 # `.dev-framework.yml` configuration reference
 
 `.dev-framework.yml` lives at the root of a repository. Its presence **activates** the
-framework for Copilot sessions in that repo, and its keys configure behavior. Commit it to
-share identical enforcement with your whole team. Every key is optional — blank or absent
-values fall back to auto-detection or a profile default.
+framework for GitHub Copilot CLI, Claude Code, and Codex CLI sessions in that repo, and its
+keys configure behavior. One file covers all three hosts—commit it to share identical enforcement
+with your whole team, whichever CLI each member uses. Every key is optional — blank or
+absent values fall back to auto-detection or a profile default.
 
 Generate a starter file with `df init`, or copy
 [`.dev-framework.example.yml`](.dev-framework.example.yml).
@@ -67,8 +68,10 @@ order (first match wins):
 3. If the file exists but sets no profile → `standard`.
 4. Otherwise → `off` (dormant).
 
-So `DEV_FRAMEWORK=strict copilot` (or `df strict`) overrides the committed profile for one
-session, and `DEV_FRAMEWORK=off` / `df off` forces a dormant session.
+So `DEV_FRAMEWORK=strict copilot`, `DEV_FRAMEWORK=strict claude`,
+`DEV_FRAMEWORK=strict codex`, or `df strict` overrides
+the committed profile for one session, and `DEV_FRAMEWORK=off` / `df off` forces a dormant
+session. Activation is identical on all three hosts.
 
 | Profile | Edit feedback | Completion gate | Protected paths |
 |---------|---------------|-----------------|-----------------|
@@ -105,11 +108,11 @@ tools that are actually installed. See the README "Language support" section for
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `format_on_edit` | `true` | Auto-format each file the agent writes (`postToolUse`). |
+| `format_on_edit` | `true` | Auto-format each file the agent writes (`postToolUse` / `PostToolUse`). |
 | `lint_on_edit` | `true` | Lint each edited file and feed violations back. |
 | `exclude` | — | Globs to skip for format/lint (e.g. `**/migrations/** **/*.min.js`). |
 
-### Completion gate (`agentStop`)
+### Completion gate (`agentStop` on Copilot CLI, `Stop` on Claude Code and Codex CLI)
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -122,7 +125,7 @@ tools that are actually installed. See the README "Language support" section for
 | `gate_timeout` | — | Seconds per gate command (requires the `timeout` tool). |
 | `gate_max_blocks` | `3` | After N blocks in a session, the gate stands down (loudly) to avoid trapping you. |
 
-### Protected paths (`preToolUse`)
+### Protected paths (`preToolUse` / `PreToolUse`)
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -135,6 +138,7 @@ tools that are actually installed. See the README "Language support" section for
 | Key | Default | Description |
 |-----|---------|-------------|
 | `style_guide` | auto-discover | Path (relative to repo root) to a style guide the agent should follow. If blank, common locations (`STYLE.md`, `CONTRIBUTING.md`, …) are auto-discovered. |
+| `host` | installed CLI preference: Copilot, Claude, Codex | `copilot`, `claude`, or `codex`—which CLI the `df` wrapper launches by default in this repo. Purely a launcher convenience: hooks and gates behave the same under every host. Overridden by `$DF_HOST` and an explicit `df <host>`. |
 
 ---
 
@@ -174,6 +178,14 @@ exclude: **/generated/** **/*.pb.go
 profile: standard
 protect: .env .env.* **/node_modules/**   # narrower than the defaults
 # or: protect_off: true
+```
+
+**A team standardized on Codex CLI**
+
+```yaml
+profile: standard
+host: codex           # `df` launches Codex CLI here; plain `codex` works too
+test: pytest -q
 ```
 
 Run `df status` in the repo to see exactly how your settings resolve, including the

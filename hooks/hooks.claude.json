@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/lib/session-start.sh\"",
+            "timeout": 20,
+            "statusMessage": "dev-framework: loading the constitution"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/lib/pre-tool-use.sh\"",
+            "timeout": 20,
+            "statusMessage": "dev-framework: checking protected paths"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/lib/post-tool-use.sh\"",
+            "timeout": 120,
+            "statusMessage": "dev-framework: format + lint"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/lib/stop-gate.sh\"",
+            "timeout": 600,
+            "statusMessage": "dev-framework: completion gate"
+          }
+        ]
+      }
+    ]
+  }
+}

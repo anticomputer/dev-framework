@@ -1,9 +1,14 @@
 # AGENTS.md — working on dev-framework itself
 
-This repo **is** a GitHub Copilot CLI plugin that enforces engineering discipline on
-Copilot sessions. When you work on it, you're improving that tool. It **dogfoods itself**:
-a committed `.dev-framework.yml` activates the framework for sessions here, so the same
-quality bar you ship applies to your own changes.
+This repo **is** a plugin—shipped for **GitHub Copilot CLI, Claude Code, and Codex CLI**—that
+enforces engineering discipline on agent sessions. When you work on it, you're improving
+that tool. It **dogfoods itself**: a committed `.dev-framework.yml` activates the framework
+for sessions here (under any host), so the same quality bar you ship applies to your own
+changes.
+
+**Multi-host is the central design constraint.** One shared engine (`hooks/lib/*.sh`, `rules/`,
+`agents/`, `skills/`) behind three manifests and three hook wirings. Any change must work on all
+hosts, or explicitly branch on `df_host`.
 
 New to the project? Read [`README.md`](README.md) first (what it does and why), then
 [`CONTRIBUTING.md`](CONTRIBUTING.md) (layout + dev loop) and
@@ -14,79 +19,165 @@ New to the project? Read [`README.md`](README.md) first (what it does and why), 
 No build step. Everything is bash + a little Python. Before finishing any change, run:
 
 ```bash
-bash tests/run.sh                          # the test suite (48+ assertions)
-python3 .github/scripts/validate-manifests.py   # manifest/schema validation
-for f in bin/df hooks/lib/*.sh tests/run.sh install.sh uninstall.sh; do bash -n "$f"; done
+bash tests/run.sh                          # the test suite (178+ assertions, three hosts)
+python3 .github/scripts/validate-manifests.py   # manifest/schema validation, three hosts
+for f in bin/df hooks/lib/*.sh tests/*.sh install.sh uninstall.sh; do bash -n "$f"; done
 ```
 
 CI (`.github/workflows/ci.yml`) runs exactly these plus `shellcheck --severity=error`.
-Requirements: `bash`, `python3`, `git` (no `copilot` needed for the suite — hooks are
-tested by feeding them the same JSON event payloads the CLI sends).
+Requirements: `bash`, `python3`, `git` (no host CLI is needed for the
+suite — hooks are tested by feeding them the same JSON event payloads each CLI sends, and
+`df`'s launcher is tested against stub binaries).
+
+If you have Claude Code, also run the live schema check when you touch a manifest, an agent,
+a skill, or the Claude hook wiring:
+
+```bash
+bash tests/validate-claude-schema.sh    # skips cleanly if `claude` isn't installed
+bash tests/validate-codex-schema.sh     # skips cleanly if `codex` isn't installed
+```
+
+It validates a staged copy of the repo with `claude plugin validate --strict`. Do **not** just
+run `claude plugin validate .` here: that validates the marketplace manifest and stops, and
+even when pointed at the plugin manifest it reads hooks only from the *default*
+`hooks/hooks.json` path — it ignores the `hooks` field in the manifest, so our hook config is
+silently skipped. The script stages `hooks/hooks.claude.json` at the default path to get it
+actually checked. Neither check is in CI (the CLI isn't available there), which is why
+`validate-manifests.py` independently enforces the event names and config shape.
 
 To try a change in a real session: `./install.sh` (registers this dir as a marketplace and
-installs via `copilot plugin install`), then `copilot plugin update dev-framework` to pick
-up further edits. `./uninstall.sh` to remove.
+installs into every CLI on your PATH), then `copilot plugin update dev-framework` /
+`claude plugin update dev-framework` to pick up further edits. `./uninstall.sh` to remove.
 
 ## Repo map
 
 | Path | What it is |
 |------|-----------|
-| `plugin.json` | Plugin manifest. Supported component fields: `agents`, `skills`, `commands`, `hooks`, `extensions`, `mcpServers`, `lspServers`. **There is no `rules` field.** |
-| `.github/plugin/marketplace.json` | Marketplace entry (so `copilot plugin install name@marketplace` works). |
-| `rules/*.md` | The constitution. **Injected at `sessionStart` (see `hooks/lib/session-start.sh`)**, not via a plugin field — that's how it stays dormant unless active. |
-| `agents/*.agent.md` | Specialist subagents (frontmatter `name`, `description`, `tools`). Investigation-only — they must never edit code. |
-| `hooks/hooks.json` + `hooks/lib/*.sh` | The enforcement engine. `common.sh` is the shared library. |
+| `plugin.json` | **Copilot CLI** manifest. Supported component fields: `agents`, `skills`, `commands`, `hooks`, `extensions`, `mcpServers`, `lspServers`. **There is no `rules` field.** |
+| `.github/plugin/marketplace.json` | **Copilot CLI** marketplace entry (so `copilot plugin install name@marketplace` works). |
+| `.claude-plugin/plugin.json` | **Claude Code** manifest. Only `name` is required; `agents/` and `skills/` are auto-discovered, so it declares just metadata + the `hooks` path. Components must **never** live inside `.claude-plugin/`. |
+| `.claude-plugin/marketplace.json` | **Claude Code** marketplace entry. Plugin `source` is `"./"` (the repo root); relative sources must start with `./`. |
+| `.codex-plugin/plugin.json` | **Codex CLI** manifest. Declares shared `skills/` and explicit Codex hook wiring. |
+| `.agents/plugins/marketplace.json` | **Codex CLI** marketplace entry. Local source path is `"./"`; version comes from the plugin manifest. |
+| `hooks/hooks.copilot.json` | Copilot CLI event wiring: camelCase events, handlers flat under the event, `bash` key, `$PLUGIN_ROOT`. |
+| `hooks/hooks.claude.json` | Claude Code event wiring: PascalCase events, handlers nested in a `hooks` array inside a matcher group, `command` key, `${CLAUDE_PLUGIN_ROOT}`. |
+| `hooks/hooks.codex.json` | Codex CLI event wiring: PascalCase events, nested matcher groups, `command` key, `$PLUGIN_ROOT`, and explicit `DF_HOST=codex`. |
+| `hooks/lib/*.sh` | The enforcement engine—**shared by all hosts**. `common.sh` is the shared library. |
+| `rules/*.md` | The constitution. **Injected at session start (see `hooks/lib/session-start.sh`)**, not via a plugin field; this is also how it stays dormant unless active. |
+| `agents/*.agent.md` | Specialist subagents (frontmatter `name`, `description`, `disallowedTools`). Investigation-only — they must never edit code. |
+| `codex-agents/*.toml` | Installer-managed Codex specialist translations with `sandbox_mode = "read-only"`. |
 | `skills/<name>/SKILL.md` | Invokable workflows (frontmatter `name`, `description`). |
-| `bin/df` | The `df` CLI (init/status/version/profile launchers). |
-| `tests/run.sh` | Self-contained test suite. |
-| `.github/scripts/validate-manifests.py` | Schema validator (also rejects a stray `rules` field). |
+| `bin/df` | The `df` CLI (init/status/version, host + profile launchers). Also on the Bash tool's `PATH` inside a Claude Code session. |
+| `tests/run.sh` | Self-contained test suite, including a per-host hook-dialect section. |
+| `tests/validate-claude-schema.sh` | Optional live `claude plugin validate --strict` check on a staged copy. |
+| `tests/validate-codex-schema.sh` | Optional isolated live Codex marketplace and plugin-install validation. |
+| `.github/scripts/validate-manifests.py` | Schema validator for **all three** ecosystems (also rejects a stray `rules` field and cross-checks manifest versions). |
 | `examples/todo-service/` | Worked example + `WALKTHROUGH.md`. |
 
 ## Conventions (must-follow)
 
-1. **Hooks no-op when dormant.** Every hook script starts with `df_active || exit 0`.
+1. **All hosts, or none.** Every behavior change must work under Copilot CLI, Claude Code,
+   and Codex CLI. Read the host with `df_host` (never sniff env vars yourself), name
+   components with `df_agent_ref`/`df_skill_ref`, and read tool targets with
+   `df_tool_files` (it covers single-path fields and multi-file Codex patches). If you add
+   a hook event, wire it in all three hook manifests using each schema and update every
+   validator event set.
+2. **Hooks no-op when dormant.** Every hook script starts with `df_active || exit 0`.
    Nothing may change behavior unless a session opted in. Add a test asserting the dormant
-   case stays silent.
-2. **Be profile-aware.** Read behavior through `df_opt <key>` (config value → profile
+   case stays silent—for all hosts.
+3. **Be profile-aware.** Read behavior through `df_opt <key>` (config value → profile
    default), never hard-code. `advisory` must never block; `standard`/`strict` may.
-3. **Reuse `common.sh`.** Shared helpers: `df_profile`/`df_active`/`df_opt`, `df_cfg`,
-   `df_lang_cmd`, `df_match_globs`, `df_changed_files`, `df_emit_context`/`df_emit_block`/
-   `df_emit_deny`, `df_read_stdin`/`df_json_get`. Don't re-implement these.
-4. **Every behavior change ships with a test** in `tests/run.sh`. Use stub commands
-   (`sh -c '...'`) so tests never depend on real tools being installed.
-5. **Keep config flat.** `.dev-framework.yml` is parsed line-by-line (`df_cfg`), not real
+4. **Reuse `common.sh`.** Shared helpers: `df_profile`/`df_active`/`df_opt`, `df_cfg`,
+   `df_host`/`df_host_label`/`df_host_bin`/`df_agent_ref`/`df_skill_ref`, `df_lang_cmd`,
+   `df_match_globs`, `df_changed_files`, `df_emit_context`/`df_emit_block`/`df_emit_deny`,
+   `df_read_stdin`/`df_json_get`/`df_tool_file`/`df_hook_event`. Don't re-implement these.
+   In particular, never hand-roll a hook verdict: the `df_emit_*` helpers emit the union of
+   all hosts' output dialects, including the `hookEventName` discriminator required by
+   Claude Code and Codex hook-specific output.
+5. **Every behavior change ships with a test** in `tests/run.sh`. Use stub commands
+   (`sh -c '...'`) so tests never depend on real tools being installed, and stub binaries
+   for anything that launches a CLI. Tests must be deterministic no matter which CLI the
+   contributor has installed or which one they're running the suite from — the suite
+   scrubs every `CLAUDE_*`/`COPILOT_*`/`PLUGIN_ROOT`/`PLUGIN_DATA`/`DF_HOST` variable up front, so each
+   case declares the host it exercises.
+6. **Keep config flat.** `.dev-framework.yml` is parsed line-by-line (`df_cfg`), not real
    YAML. New keys must be documented in `CONFIGURATION.md` **and** `.dev-framework.example.yml`,
    and surfaced by `df init`/`df status` where relevant.
-6. **Language detection is gated on tool availability** (`df_bin`/`command -v`). Never emit
+7. **Language detection is gated on tool availability** (`df_bin`/`command -v`). Never emit
    a command for a tool that isn't installed.
+8. **Keep version-bearing manifests in lockstep.** A release bumps the four existing
+   Copilot/Claude manifest and marketplace versions plus `.codex-plugin/plugin.json`;
+   Codex marketplace entries resolve the plugin version from that manifest.
 
 ## Hard-won gotchas (don't relearn these)
 
-- **The official docs are authoritative** — read them, don't reverse-engineer the binary:
-  https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot and
-  https://docs.github.com/en/copilot/reference/cli-plugin-reference.
-- **Plugins can't contribute always-on instructions** (no `rules` field) — the constitution
-  is injected by the `sessionStart` hook. Keep `rules/*.md` as the source it reads.
+- **The official docs are authoritative** — read them, don't reverse-engineer the binaries:
+  - Copilot CLI: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot
+    and https://docs.github.com/en/copilot/reference/cli-plugin-reference
+  - Claude Code: https://code.claude.com/docs/en/plugins-reference,
+    https://code.claude.com/docs/en/hooks, https://code.claude.com/docs/en/plugin-marketplaces
+  - Codex CLI: https://developers.openai.com/plugins/build/plugins,
+    https://learn.chatgpt.com/docs/hooks, https://learn.chatgpt.com/docs/agent-configuration/subagents
+- **Plugin installation must not make the constitution always active** (Copilot has no
+  `rules` field; a `CLAUDE.md` at a plugin's root is explicitly *not* loaded)—the constitution is
+  injected by the session-start hook. Keep `rules/*.md` as the source it reads.
 - **Skill frontmatter is just `name` + `description`** (+ optional `license`, `allowed-tools`).
   Other fields seen in third-party repos are *their* linter's convention, not the CLI's.
-- **Hook event keys** (in `hooks.json`): `sessionStart`, `userPromptSubmitted`, `preToolUse`,
-  `postToolUse`, `agentStop`, `sessionEnd`, … (note `userPromptSubmitted` and `agentStop`,
-  not `userPromptSubmit`/`stop`). Plugin hooks live at `hooks/hooks.json`.
-- **Hook payload** arrives as JSON on stdin (snake_case: `tool_name`, `tool_input`,
-  `session_id`, `hook_event_name`, `cwd`); `matcher` is matched against canonical tool names
-  (`Edit`/`Write`/`edit`/`create` are all covered by the existing regex).
-- **Plugin hook scripts get `$PLUGIN_ROOT` and `$COPILOT_PROJECT_DIR`** injected — use them
-  (that's why the framework needs nothing copied into target repos).
+- **Hook payloads share common snake_case fields**—JSON on stdin with
+  (`tool_name`, `tool_input`, `session_id`, `hook_event_name`, `cwd`). The **outputs are
+  not**: Copilot reads top-level verdicts, while Claude Code and Codex also consume
+  `hookSpecificOutput` discriminated by `hookEventName`. Codex `apply_patch` sends the full
+  patch in `tool_input.command`, so use `df_tool_files`. `df_emit_*` emits the compatible
+  union; don't bypass it.
+- **Hook-config schemas differ in shape and roots.** Copilot uses camelCase events and flat
+  `bash` handlers. Claude Code and Codex use PascalCase matcher groups with nested `command`
+  handlers; Claude uses `${CLAUDE_PLUGIN_ROOT}`, while Codex uses `$PLUGIN_ROOT` and must set
+  `DF_HOST=codex` because it also exports Claude compatibility variables.
+- **Event-name traps.** Copilot: `userPromptSubmitted` and `agentStop` (not
+  `userPromptSubmit`/`stop`). Claude Code: `Stop` and `UserPromptSubmit` (not
+  `agentStop`/`userPromptSubmitted`). The completion gate is `agentStop` on one and `Stop` on
+  the other — hence one script wired twice.
+- **There is deliberately no `hooks/hooks.json`.** Claude Code and Codex auto-discover that
+  exact path, while Copilot has no default hooks path. Every manifest therefore points at its
+  own `hooks/hooks.<host>.json`, and the ambiguous default stays empty.
+  The cost is that `claude plugin validate` won't see our hook config (it only reads the
+  default path) — `tests/validate-claude-schema.sh` stages a copy to get around that.
+- **Claude Code's `.claude-plugin/` holds only `plugin.json`/`marketplace.json`** — every
+  component directory (`agents/`, `skills/`, `hooks/`) must sit at the repo root. Component
+  paths in the manifest must start with `./`; a marketplace `source` of `"."` is invalid
+  (use `"./"`).
+- **Codex's `.codex-plugin/` holds only `plugin.json`.** Skills, hooks, and optional assets
+  remain at the plugin root. Codex custom agents are not a plugin-manifest component, so the
+  repository installer copies `codex-agents/*.toml` into the user's Codex agents directory.
+- **Agent frontmatter `tools`/`disallowedTools` must be a comma-separated string.** A YAML
+  list (a `tools:` line followed by `- "*"`) is read by Claude Code as a literal tool name,
+  which strands the agent. Omitting `tools` grants all tools on those hosts, so the specialists
+  omit it and use `disallowedTools` to enforce investigation-only where the host supports it.
+  The validator rejects the list form.
+- **Tool names differ.** Copilot edits via `edit`/`create` with `tool_input.path`; Claude Code
+  uses `file_path`/`notebook_path`; Codex uses multi-file `apply_patch` content in
+  `tool_input.command`. Use `df_tool_files`, and keep every matcher broad enough for its host.
+- **Plugin hook scripts get paths injected**: `$PLUGIN_ROOT`/`$COPILOT_PROJECT_DIR` (Copilot)
+  or `$CLAUDE_PLUGIN_ROOT`/`$CLAUDE_PROJECT_DIR`/`$CLAUDE_PLUGIN_DATA` (Claude Code) — use
+  them; Codex injects `$PLUGIN_ROOT`/`$PLUGIN_DATA` and runs commands from the session cwd.
 - **Bash/Python pitfalls already fixed** (keep them fixed): don't combine a stdin pipe with a
   `python3 -` heredoc (the heredoc wins — pass data via env, see `df_json_get`); only strip a
   *matching* surrounding quote pair in `df_cfg` (don't strip lone quotes from commands).
-- **Install is marketplace-based**; direct repo/URL/local-path installs are deprecated.
+- **Install is marketplace-based on all hosts**; Copilot's direct repo/URL/local-path
+  installs are deprecated. `claude plugin install` needs `--scope user` to stay
+  non-interactive. Codex uses `codex plugin add` and requires hook review through `/hooks`.
+- **Claude Code puts a plugin's `bin/` on the Bash tool's `PATH`**, so `df` is callable from
+  inside a session — keep `bin/df` self-contained and side-effect-free until it's told to
+  launch something.
 
 ## Releasing
 
-Bump `version` in `plugin.json` **and** `.github/plugin/marketplace.json`, move the
-`CHANGELOG.md` `[Unreleased]` section under a new version heading, commit, then
-`git tag -a vX.Y.Z -m "..."` and push with `--tags`.
+Bump `version` in every version-bearing manifest—`plugin.json`,
+`.github/plugin/marketplace.json`, `.claude-plugin/plugin.json`,
+`.claude-plugin/marketplace.json`, and `.codex-plugin/plugin.json`—move the `CHANGELOG.md`
+`[Unreleased]` section under a new version heading, commit, then tag and push. The Codex
+marketplace resolves the version from `.codex-plugin/plugin.json` and has no separate version
+field. `validate-manifests.py` fails when version-bearing files disagree.
 
 When creating commits, append:
 `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`

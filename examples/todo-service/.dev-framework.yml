@@ -1,5 +1,6 @@
 # dev-framework — defines this repo's profile, commands, and where the style guide lives.
-# With this file committed, every Copilot session in this repo runs on the rails below.
+# With this file committed, every Copilot CLI or Claude Code session in this repo runs on
+# the rails below — the same file drives both hosts.
 
 profile: standard          # gate blocks completion on failing type-check/tests
 
